@@ -1,23 +1,33 @@
-class StudySession {
+class SessaoEstudo {
   final int? id;
-  final String subject; // Ex: Direito Tributário
-  final DateTime date;
-  final int minutes; // Tempo estudado
+  final String materia; // Mudamos de subject para materia
+  final DateTime data; // Mudamos de date para data
+  final int minutos;
 
-  StudySession({
+  SessaoEstudo({
     this.id,
-    required this.subject,
-    required this.date,
-    required this.minutes,
+    required this.materia,
+    required this.data,
+    required this.minutos,
   });
 
-  // Converte para Map (para salvar no banco de dados)
+  // Converte para Map (para o banco)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'subject': subject,
-      'date': date.toIso8601String(),
-      'minutes': minutes,
+      'materia': materia,
+      'data': data.toIso8601String(),
+      'minutos': minutos,
     };
+  }
+
+  // Converte de Map para Objeto (para ler do banco)
+  factory SessaoEstudo.fromMap(Map<String, dynamic> map) {
+    return SessaoEstudo(
+      id: map['id'],
+      materia: map['materia'],
+      data: DateTime.parse(map['data']),
+      minutos: map['minutos'],
+    );
   }
 }
