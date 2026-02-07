@@ -3,6 +3,8 @@ import '../database/db_helper.dart';
 import '../models/sessao_estudo.dart';
 import '../widgets/modal_cadastro.dart';
 import 'tela_cronometro.dart';
+import 'tela_questoes.dart';
+import 'tela_estatisticas.dart';
 
 class TelaInicial extends StatefulWidget {
   @override
@@ -13,11 +15,38 @@ class _TelaInicialState extends State<TelaInicial> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('ZionMindPro - Meus Estudos'),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-      ),
+appBar: AppBar(
+        title: Text('ZionMindPro'),
+        backgroundColor: Colors.transparent,
+        actions: [
+          // Botão de Estatísticas (NOVO)
+          IconButton(
+            icon: Icon(
+              Icons.bar_chart,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (ctx) => TelaEstatisticas()),
+              );
+            },
+          ),
+          // Botão de Questões (QUE JÁ EXISTIA)
+          IconButton(
+            icon: Icon(
+              Icons.quiz,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (ctx) => TelaQuestoes()),
+              );
+            },
+          ),
+        ],
+      ),      
       body: FutureBuilder<List<SessaoEstudo>>(
         future: DbHelper.instance.listarSessoes(), // Busca os dados
         builder: (context, snapshot) {

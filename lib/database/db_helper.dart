@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/sessao_estudo.dart';
+import '../models/questao.dart';
 
 class DbHelper {
   static final DbHelper instance = DbHelper._init();
@@ -75,6 +76,26 @@ class DbHelper {
     return result.map((json) => SessaoEstudo.fromMap(json)).toList();
   }
 
-  // --- MÉTODOS DE QUESTÕES (Faremos a tela em breve) ---
-  // Aqui virão os métodos para inserir e buscar questões
+  // --- MÉTODOS DE QUESTÕES ---
+  
+  Future<int> inserirQuestao(Questao questao) async {
+    final db = await instance.database;
+    return await db.insert('questoes', questao.toMap());
+  }
+
+  Future<List<Questao>> listarQuestoes() async {
+    final db = await instance.database;
+    // Ordena pelas mais recentes
+    final result = await db.query('questoes', orderBy: 'data DESC');
+    return result.map((json) => Questao.fromMap(json)).toList();
+  }
+
+  // Estatística Rápida: Total de Questões Feitas
+  Future<int> totalQuestoesFeitas() async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      'SELECT SUM(qtd_feitas) as total FROM questoes',
+    );
+    return result.first['total'] as int? ?? 0;
+  }
 }
