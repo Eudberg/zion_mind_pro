@@ -40,6 +40,10 @@ dependencies:
   shared_preferences: ^2.2.2 # Configurações simples (ex: seu nome)
   google_fonts: ^6.1.0     # Para o app ficar com visual profissional
   flutter_heatmap_calendar: ^1.0.5 # Aquele gráfico de calor das suas horas
+  fl_chart: ^0.66.0   # Novo: Para os gráficos de desempenho
+  csv: ^6.0.0         # Novo: Para ler suas planilhas de mentoria
+  intl: ^0.19.0       # Novo: Para formatar datas
+  percent_indicator: ^4.2.3 # Novo: Para barras de progresso circulares
 
 dev_dependencies:
   flutter_test:

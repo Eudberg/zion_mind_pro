@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../database/db_helper.dart';
 import '../models/sessao_estudo.dart';
 import '../widgets/modal_cadastro.dart';
+import 'tela_cronometro.dart';
 
 class TelaInicial extends StatefulWidget {
   @override
@@ -60,25 +61,20 @@ class _TelaInicialState extends State<TelaInicial> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            builder: (ctx) => Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: ModalCadastro(
-                onSave: () {
-                  setState(() {}); // Atualiza a lista após salvar
-                },
-              ),
-            ),
+        onPressed: () async {
+          // Navega para a tela do cronômetro e espera ela voltar
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => TelaCronometro()),
           );
+          // Quando voltar, atualiza a lista de estudos feitos
+          setState(() {});
         },
-        child: Icon(Icons.add),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+        child: Icon(Icons.timer), // Ícone de relógio
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.secondary, // Electric Teal
+        foregroundColor: Colors.black,
       ),
     );
   }
