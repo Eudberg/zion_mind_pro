@@ -57,7 +57,7 @@ class _TelaCronometroState extends State<TelaCronometro> {
     await _service.pausar(); // Garante que parou
     final minutos = _tempoAtual.inMinutes;
 
-if (minutos > 0) {
+    if (minutos > 0) {
       final sessao = SessaoEstudo(
         materia: _materiaController.text,
         data: DateTime.now(),
@@ -90,6 +90,7 @@ if (minutos > 0) {
       ).showSnackBar(SnackBar(content: Text('Estude pelo menos 1 minuto!')));
     }
   }
+
   @override
   void dispose() {
     _timer?.cancel();
