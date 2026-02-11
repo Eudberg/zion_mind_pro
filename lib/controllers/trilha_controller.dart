@@ -1,9 +1,11 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../data/trilha_importer.dart';
 import '../database/tarefas_trilha_dao.dart';
 import '../models/tarefa_trilha.dart';
+import '../models/disciplina.dart';
+import '../models/plano_item.dart'; // <--- Importando o SEU modelo existente
 
 class TrilhaController extends ChangeNotifier {
   final TarefasTrilhaDao _dao = TarefasTrilhaDao();
@@ -15,12 +17,80 @@ class TrilhaController extends ChangeNotifier {
   bool _carregando = false;
   bool get carregando => _carregando;
 
+  // --- VARIÁVEIS DE PLANEJAMENTO ---
+  DateTime _dataSelecionada = DateTime.now();
+
+  // Agora a lista é de 'PlanoItem' para bater com a sua tela
+  List<PlanoItem> _planoDoDia = [];
+
+  // Mapa para a tela buscar o Nome/Descrição da tarefa pelo ID
+  Map<int, TarefaTrilha> _tarefasPorId = {};
+
+  // --- GETTERS (Resolvendo os erros da Tela) ---
+  DateTime get dataSelecionada => _dataSelecionada;
+  List<PlanoItem> get planoDoDia => _planoDoDia;
+  Map<int, TarefaTrilha> get tarefasPorId => _tarefasPorId;
+
+  // Estatísticas
+  int get totalMinutosEfetivos =>
+      _tarefas.where((t) => t.concluida).length * 60;
+  int get totalMinutosPlanejados => _tarefas.length * 60;
+  int get diasAtivos => 1;
+
+  // ===========================================================================
+  // LÓGICA DE PLANEJAMENTO (O Coração do problema)
+  // ===========================================================================
+
+  // Método que a tela chama (com ou sem data)
+  void gerarPlanoDoDia([DateTime? data]) {
+    _dataSelecionada = data ?? DateTime.now();
+
+    if (_tarefas.isEmpty) {
+      _planoDoDia = [];
+      _tarefasPorId = {};
+    } else {
+      // 1. Filtra o que está pendente na trilha
+      final pendentes = _tarefas.where((t) => !t.concluida).toList();
+
+      // 2. Ordena pela ordem global da trilha
+      pendentes.sort(
+        (a, b) => (a.ordemGlobal ?? 0).compareTo(b.ordemGlobal ?? 0),
+      );
+
+      // 3. Define a META DO DIA (Ex: Próximas 6 tarefas)
+      final metaDoDia = pendentes.take(6).toList();
+
+      // 4. Converte Tarefas em PlanoItems (usando o SEU modelo existente)
+      _planoDoDia = metaDoDia.map((t) {
+        return PlanoItem(
+          id: null, // Ainda não salvo no banco de planos, é em memória
+          data: _dataSelecionada,
+          tarefaId: t.id,
+          tipo: 'estudo', // Define o tipo padrão
+          minutosSugeridos: t.chPlanejadaMin ?? 60,
+          status: 'pendente', // String, conforme seu modelo
+        );
+      }).toList();
+
+      // 5. Popula o Mapa para a tela preencher os textos
+      _tarefasPorId = {for (var t in _tarefas) t.id!: t};
+    }
+
+    notifyListeners();
+  }
+
+  // ===========================================================================
+  // MÉTODOS DE MANUTENÇÃO (CARREGAR, IMPORTAR, ATUALIZAR)
+  // ===========================================================================
+
   Future<void> carregarTarefas() async {
     _carregando = true;
     notifyListeners();
 
     try {
       _tarefas = await _dao.listarTodas();
+      // Ao carregar o banco, já gera o plano para a tela não ficar vazia
+      gerarPlanoDoDia(_dataSelecionada);
     } finally {
       _carregando = false;
       notifyListeners();
@@ -42,7 +112,6 @@ class TrilhaController extends ChangeNotifier {
 
     final tarefasImportadas = await _importer.importarBytes(bytes);
 
-    // Se o import falhar (vazio), não apaga o banco
     if (tarefasImportadas.isEmpty) return;
 
     await _dao.limparTudo();
@@ -54,7 +123,6 @@ class TrilhaController extends ChangeNotifier {
   Future<void> alternarConcluida(TarefaTrilha tarefa, bool concluida) async {
     final id = tarefa.id;
     if (id == null) return;
-
     await _dao.marcarConcluida(id, concluida);
     await carregarTarefas();
   }
@@ -73,28 +141,31 @@ class TrilhaController extends ChangeNotifier {
       fonteQuestoes: fonteQuestoes,
       concluida: concluida,
     );
-
     await carregarTarefas();
   }
-    /// Disciplinas vindas do CSV (usadas na Tela Inicial)
-  List<String> get disciplinasDoCsv {
-    final set = <String>{};
 
-    for (final t in tarefas) {
-      // <- já usa seu getter existente
-      final d = (t.disciplina ?? '').trim();
-      if (d.isEmpty) continue;
+  // --- PARA A TELA INICIAL (DISCIPLINAS) ---
+  List<Disciplina> get disciplinasObjetos {
+    final Map<String, List<TarefaTrilha>> agrupado = {};
 
-      final norm = d.replaceAll(RegExp(r'\s+'), ' ').trim();
-      set.add(norm);
+    for (var t in _tarefas) {
+      final nome = (t.disciplina ?? 'Geral').trim();
+      if (!agrupado.containsKey(nome)) agrupado[nome] = [];
+      agrupado[nome]!.add(t);
     }
 
-    final list = set.toList();
-    list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return list;
+    final lista = agrupado.entries.map((entry) {
+      final total = entry.value.length;
+      final concluidas = entry.value.where((t) => t.concluida).length;
+
+      return Disciplina.fromTarefas(
+        nome: entry.key,
+        totalTarefas: total,
+        tarefasConcluidas: concluidas,
+      );
+    }).toList();
+
+    lista.sort((a, b) => a.nome.compareTo(b.nome));
+    return lista;
   }
-
-  /// alias opcional (caso alguma tela use "disciplinas")
-  List<String> get disciplinas => disciplinasDoCsv;
-
 }

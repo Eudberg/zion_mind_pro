@@ -38,7 +38,7 @@ class TelaInicial extends StatelessWidget {
       ),
       body: Consumer<TrilhaController>(
         builder: (context, trilha, _) {
-          final disciplinas = trilha.disciplinasDoCsv;
+          final disciplinas = trilha.disciplinasObjetos;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
