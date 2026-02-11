@@ -1,7 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
 import '../models/sessao_estudo.dart';
-import '../models/questao.dart';
 
 class DbHelper {
   static final DbHelper instance = DbHelper._init();
@@ -11,7 +11,7 @@ class DbHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('zion_mind_pro_v2.db');
+    _database = await _initDB('zion_mind_pro_v3.db');
     return _database!;
   }
 
@@ -21,56 +21,31 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future _createDB(Database db, int version) async {
-    await _createCoreTables(db);
     await _createTrilhaTables(db);
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     await _createTrilhaTables(db);
-  }
 
-  Future _createCoreTables(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS sessoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        materia TEXT NOT NULL,
-        data TEXT NOT NULL,
-        minutos INTEGER NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS questoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        materia TEXT NOT NULL,
-        assunto TEXT,
-        data TEXT NOT NULL,
-        qtd_feitas INTEGER NOT NULL,
-        qtd_acertos INTEGER NOT NULL,
-        tarefa_id INTEGER
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS tarefas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ordem INTEGER,
-        materia TEXT NOT NULL,
-        assunto TEXT NOT NULL,
-        descricao TEXT,
-        status TEXT DEFAULT 'pendente',
-        data_conclusao TEXT,
-        desempenho_medio REAL,
-        proxima_revisao TEXT
-      )
-    ''');
+    // tenta adicionar colunas novas sem quebrar
+    if (oldVersion < 3) {
+      for (final sql in [
+        "ALTER TABLE tarefas_trilha ADD COLUMN concluida INTEGER DEFAULT 0",
+        "ALTER TABLE tarefas_trilha ADD COLUMN ordem_global INTEGER",
+        "ALTER TABLE tarefas_trilha ADD COLUMN fonte_questoes TEXT",
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
+    }
   }
 
   Future _createTrilhaTables(Database db) async {
@@ -80,20 +55,21 @@ class DbHelper {
         trilha TEXT,
         data_planejada TEXT,
         tarefa_codigo TEXT,
+        ordem_global INTEGER,
         disciplina TEXT,
         descricao TEXT,
         ch_planejada_min INTEGER,
         ch_efetiva_min INTEGER,
         questoes INTEGER,
         acertos INTEGER,
+        fonte_questoes TEXT,
         desempenho REAL,
-        rev_24h TEXT,
         rev_7d TEXT,
-        rev_15d TEXT,
         rev_30d TEXT,
         rev_60d TEXT,
         json_extra TEXT,
-        hash_linha TEXT
+        hash_linha TEXT,
+        concluida INTEGER DEFAULT 0
       )
     ''');
 
@@ -105,6 +81,27 @@ class DbHelper {
         tipo TEXT,
         minutos_sugeridos INTEGER,
         status TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS revisoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tarefa_id INTEGER,
+        tipo TEXT,
+        data_prevista TEXT,
+        status TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS questoes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        materia TEXT,
+        assunto TEXT,
+        data TEXT,
+        qtd_feitas INTEGER,
+        qtd_acertos INTEGER
       )
     ''');
 
@@ -121,17 +118,19 @@ class DbHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS revisoes (
+      CREATE TABLE IF NOT EXISTS sessoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tarefa_id INTEGER,
-        tipo TEXT,
-        data_prevista TEXT,
-        status TEXT
+        materia TEXT,
+        data TEXT,
+        minutos INTEGER
       )
     ''');
 
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_tarefas_trilha_data ON tarefas_trilha(data_planejada)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tarefas_trilha_ordem ON tarefas_trilha(ordem_global)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_plano_diario_data ON plano_diario(data)',
@@ -141,35 +140,8 @@ class DbHelper {
     );
   }
 
-  // Sessao (tempo) - legado
   Future<int> inserirSessao(SessaoEstudo sessao) async {
-    final db = await instance.database;
-    return await db.insert('sessoes', sessao.toLegacyMap());
-  }
-
-  Future<List<SessaoEstudo>> listarSessoes() async {
-    final db = await instance.database;
-    final result = await db.query('sessoes', orderBy: 'data DESC');
-    return result.map((json) => SessaoEstudo.fromLegacyMap(json)).toList();
-  }
-
-  // Questoes
-  Future<int> inserirQuestao(Questao questao) async {
-    final db = await instance.database;
-    return await db.insert('questoes', questao.toMap());
-  }
-
-  Future<List<Questao>> listarQuestoes() async {
-    final db = await instance.database;
-    final result = await db.query('questoes', orderBy: 'data DESC');
-    return result.map((json) => Questao.fromMap(json)).toList();
-  }
-
-  Future<int> totalQuestoesFeitas() async {
-    final db = await instance.database;
-    final result = await db.rawQuery(
-      'SELECT SUM(qtd_feitas) as total FROM questoes',
-    );
-    return result.first['total'] as int? ?? 0;
+    final db = await database;
+    return db.insert('sessoes', sessao.toLegacyMap());
   }
 }

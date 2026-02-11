@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
-import '../database/db_helper.dart';
-import '../models/questao.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 
+import '../database/questoes_dao.dart';
+import '../models/questao.dart';
+
 class TelaQuestoes extends StatefulWidget {
+  const TelaQuestoes({super.key});
+
   @override
-  _TelaQuestoesState createState() => _TelaQuestoesState();
+  State<TelaQuestoes> createState() => _TelaQuestoesState();
 }
 
 class _TelaQuestoesState extends State<TelaQuestoes> {
+  final QuestoesDao _questoesDao = QuestoesDao();
+
   final _materiaController = TextEditingController();
   final _assuntoController = TextEditingController();
   final _feitasController = TextEditingController();
@@ -72,10 +77,10 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: _salvarNoBanco,
-              child: Text("Salvar Desempenho"),
               style: ElevatedButton.styleFrom(
                 minimumSize: Size(double.infinity, 50),
               ),
+              child: Text("Salvar Desempenho"),
             ),
           ],
         ),
@@ -95,7 +100,11 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
         qtdFeitas: feitas,
         qtdAcertos: acertos,
       );
-      await DbHelper.instance.inserirQuestao(novaQuestao);
+      await _questoesDao.inserir(novaQuestao);
+
+      if (!mounted) {
+        return;
+      }
 
       // Limpa e fecha
       _materiaController.clear();
@@ -121,13 +130,14 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
         backgroundColor: Colors.transparent,
       ),
       body: FutureBuilder<List<Questao>>(
-        future: DbHelper.instance.listarQuestoes(),
+        future: _questoesDao.listarTodas(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return Center(child: CircularProgressIndicator());
+          }
           final lista = snapshot.data!;
 
-          if (lista.isEmpty)
+          if (lista.isEmpty) {
             return Center(
               child: Text(
                 "Nenhuma questão registrada.\nVamos treinar?",
@@ -135,6 +145,7 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
               ),
             );
 
+          }
           return ListView.builder(
             padding: EdgeInsets.all(12),
             itemCount: lista.length,
@@ -191,8 +202,8 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _adicionarQuestao,
-        child: Icon(Icons.quiz),
         backgroundColor: Theme.of(context).primaryColor,
+        child: Icon(Icons.quiz),
       ),
     );
   }

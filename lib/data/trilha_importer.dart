@@ -6,7 +6,6 @@ import 'package:csv/csv.dart';
 import '../database/plano_diario_dao.dart';
 import '../database/revisoes_dao.dart';
 import '../database/tarefas_trilha_dao.dart';
-import '../models/revisao.dart';
 import '../models/tarefa_trilha.dart';
 
 class TrilhaImporter {
@@ -18,9 +17,9 @@ class TrilhaImporter {
     TarefasTrilhaDao? tarefasDao,
     RevisoesDao? revisoesDao,
     PlanoDiarioDao? planoDao,
-  })  : _tarefasDao = tarefasDao ?? TarefasTrilhaDao(),
-        _revisoesDao = revisoesDao ?? RevisoesDao(),
-        _planoDao = planoDao ?? PlanoDiarioDao();
+  }) : _tarefasDao = tarefasDao ?? TarefasTrilhaDao(),
+       _revisoesDao = revisoesDao ?? RevisoesDao(),
+       _planoDao = planoDao ?? PlanoDiarioDao();
 
   Future<List<TarefaTrilha>> importarBytes(
     Uint8List bytes, {
@@ -28,105 +27,27 @@ class TrilhaImporter {
   }) async {
     final conteudo = _decode(bytes);
     final delimiter = _detectDelimiter(conteudo);
-    final rows = CsvToListConverter(
-      fieldDelimiter: delimiter,
-      shouldParseNumbers: false,
-    ).convert(conteudo);
 
-    final headerIndex = _findHeaderIndex(rows);
-    if (headerIndex < 0) {
-      throw Exception('Cabecalho nao encontrado no CSV.');
+    final rows = const CsvToListConverter(
+      eol: '\n',
+      shouldParseNumbers: false,
+    ).convert(conteudo, fieldDelimiter: delimiter);
+
+    if (rows.isEmpty) return [];
+
+    final headerRowIndex = _findHeaderRow(rows);
+    if (headerRowIndex < 0) {
+      throw Exception(
+        'Nao encontrei o cabecalho do CSV (DISCIPLINA / TAREFA / TAREFAS / CH).',
+      );
     }
 
-    final headerRow = rows[headerIndex];
-    final headerMap = _buildHeaderMap(headerRow);
-    final rawHeaders = headerRow.map((e) => e?.toString() ?? '').toList();
-
-    final tarefas = <TarefaTrilha>[];
-    String? trilhaAtual;
-
-    for (var i = headerIndex + 1; i < rows.length; i++) {
-      final row = rows[i];
-      if (_isRowEmpty(row)) continue;
-
-      final rawTrilha = _valueByKey(row, headerMap, 'trilha');
-      if (rawTrilha != null && rawTrilha.trim().isNotEmpty) {
-        trilhaAtual = rawTrilha.trim();
-      }
-
-      final trilha = (rawTrilha != null && rawTrilha.trim().isNotEmpty)
-          ? rawTrilha.trim()
-          : trilhaAtual;
-
-      final dataPlanejada =
-          _parseDate(_valueByKey(row, headerMap, 'data_planejada'));
-
-      final tarefaCodigo = _valueByKey(row, headerMap, 'tarefa_codigo');
-      final disciplina = _valueByKey(row, headerMap, 'disciplina');
-      final descricao = _valueByKey(row, headerMap, 'descricao');
-      final chPlanejada =
-          _parseMinutos(_valueByKey(row, headerMap, 'ch_planejada_min'));
-      final chEfetiva =
-          _parseMinutos(_valueByKey(row, headerMap, 'ch_efetiva_min'));
-      final questoes = _parseInt(_valueByKey(row, headerMap, 'questoes'));
-      final acertos = _parseInt(_valueByKey(row, headerMap, 'acertos'));
-      final desempenho =
-          _parseDouble(_valueByKey(row, headerMap, 'desempenho'));
-
-      final rev24h = _parseDate(_valueByKey(row, headerMap, 'rev_24h'));
-      final rev7d = _parseDate(_valueByKey(row, headerMap, 'rev_7d'));
-      final rev15d = _parseDate(_valueByKey(row, headerMap, 'rev_15d'));
-      final rev30d = _parseDate(_valueByKey(row, headerMap, 'rev_30d'));
-      final rev60d = _parseDate(_valueByKey(row, headerMap, 'rev_60d'));
-
-      final extras = _extractExtras(
-        row,
-        rawHeaders,
-        headerMap.values.toSet(),
-      );
-
-      final computedRev24h = rev24h ??
-          (dataPlanejada != null
-              ? dataPlanejada.add(const Duration(days: 1))
-              : null);
-      final computedRev7d = rev7d ??
-          (dataPlanejada != null
-              ? dataPlanejada.add(const Duration(days: 7))
-              : null);
-      final computedRev15d = rev15d ??
-          (dataPlanejada != null
-              ? dataPlanejada.add(const Duration(days: 15))
-              : null);
-      final computedRev30d = rev30d ??
-          (dataPlanejada != null
-              ? dataPlanejada.add(const Duration(days: 30))
-              : null);
-      final computedRev60d = rev60d ??
-          (dataPlanejada != null
-              ? dataPlanejada.add(const Duration(days: 60))
-              : null);
-
-      final tarefa = TarefaTrilha(
-        trilha: trilha,
-        dataPlanejada: dataPlanejada,
-        tarefaCodigo: tarefaCodigo,
-        disciplina: disciplina,
-        descricao: descricao,
-        chPlanejadaMin: chPlanejada,
-        chEfetivaMin: chEfetiva,
-        questoes: questoes,
-        acertos: acertos,
-        desempenho: desempenho,
-        rev24h: computedRev24h,
-        rev7d: computedRev7d,
-        rev15d: computedRev15d,
-        rev30d: computedRev30d,
-        rev60d: computedRev60d,
-        jsonExtra: extras.isEmpty ? null : jsonEncode(extras),
-        hashLinha: _hashRow(row),
-      );
-
-      tarefas.add(tarefa);
+    final header = rows[headerRowIndex]
+        .map((e) => e?.toString() ?? '')
+        .toList();
+    final headerIndex = <String, int>{};
+    for (var i = 0; i < header.length; i++) {
+      headerIndex[_norm(header[i])] = i;
     }
 
     if (limparAntes) {
@@ -135,168 +56,133 @@ class TrilhaImporter {
       await _tarefasDao.limparTudo();
     }
 
-    final ids = await _tarefasDao.inserirEmLote(tarefas);
-    final tarefasComId = <TarefaTrilha>[];
-    final revisoes = <Revisao>[];
+    int seq = 0;
+    final tarefas = <TarefaTrilha>[];
 
-    for (var i = 0; i < tarefas.length; i++) {
-      final tarefa = tarefas[i].copyWith(id: ids[i]);
-      tarefasComId.add(tarefa);
+    for (var r = headerRowIndex + 1; r < rows.length; r++) {
+      final row = rows[r];
+      if (_rowEmpty(row)) continue;
 
-      if (tarefa.dataPlanejada != null) {
-        revisoes.addAll(_gerarRevisoes(tarefa));
+      String? v(String key) => _value(headerIndex, row, key);
+
+      final trilhaCsv = v('trilha');
+      final dataPlanejada = _parseDate(v('data'));
+      final tarefaNum = _parseInt(v('tarefa')); // número global (se vier)
+      final disciplinaRaw = (v('disciplina') ?? '').trim();
+
+      // descrição longa geralmente vem em "TAREFAS"
+      final descricao = (v('tarefas') ?? v('descricao') ?? '').trim();
+
+      final chPlanejadaMin = _parseMinutos(v('ch'));
+      final chEfetivaMin = _parseMinutos(v('ch_efetiva'));
+
+      final questoes =
+          _parseInt(v('tot_quest_feitas')) ?? _parseInt(v('questoes'));
+      final acertos = _parseInt(v('tot_acertos')) ?? _parseInt(v('acertos'));
+
+      final desempenhoCsv = _parseDouble(v('desempenho'));
+
+      // ignora “linhas de separador”
+      final pareceSeparador =
+          (tarefaNum == null && disciplinaRaw.isEmpty && descricao.isEmpty);
+      if (pareceSeparador) continue;
+
+      // ordem global: usa a coluna se for válida, senão sequencial
+      final ordemGlobal = (tarefaNum != null && tarefaNum > 0)
+          ? tarefaNum
+          : (++seq);
+
+      final trilhaIndex = (ordemGlobal - 1) ~/ 25;
+      final posNaTrilha = ((ordemGlobal - 1) % 25) + 1;
+
+      final disciplina = _normalizarNomeDisciplina(disciplinaRaw);
+
+      final desempenho = _normalizeDesempenho(
+        desempenhoCsv,
+        questoes: questoes,
+        acertos: acertos,
+      );
+
+      final extras = <String, dynamic>{};
+      if (trilhaCsv != null && trilhaCsv.trim().isNotEmpty) {
+        extras['trilha_csv'] = trilhaCsv.trim();
       }
+
+      tarefas.add(
+        TarefaTrilha(
+          trilha: 'TRILHA $trilhaIndex',
+          dataPlanejada: dataPlanejada,
+          tarefaCodigo: '$posNaTrilha',
+          ordemGlobal: ordemGlobal,
+          disciplina: disciplina.isEmpty ? null : disciplina,
+          descricao: descricao.isEmpty ? null : descricao,
+          chPlanejadaMin: chPlanejadaMin,
+          chEfetivaMin: chEfetivaMin ?? 0,
+          questoes: questoes,
+          acertos: acertos,
+          fonteQuestoes: null,
+          desempenho: desempenho,
+          rev7d: null,
+          rev30d: null,
+          rev60d: null,
+          jsonExtra: extras.isEmpty ? null : jsonEncode(extras),
+          hashLinha: '$ordemGlobal|$disciplina|$descricao'.hashCode.toString(),
+          concluida: false,
+        ),
+      );
     }
 
-    if (revisoes.isNotEmpty) {
-      await _revisoesDao.inserirEmLote(revisoes);
+    // garante ordenação global
+    tarefas.sort((a, b) => (a.ordemGlobal ?? 0).compareTo(b.ordemGlobal ?? 0));
+
+    // se você usou tarefaNum, pode ter “buracos” — isso não quebra.
+    // se quiser forçar 1..N sempre, comente a linha acima e use seq.
+
+    final ids = await _tarefasDao.inserirEmLote(tarefas);
+
+    final out = <TarefaTrilha>[];
+    for (var i = 0; i < tarefas.length; i++) {
+      out.add(tarefas[i].copyWith(id: ids[i]));
     }
-
-    return tarefasComId;
+    return out;
   }
 
-  List<Revisao> _gerarRevisoes(TarefaTrilha tarefa) {
-    final base = tarefa.dataPlanejada;
-    if (base == null) return [];
-
-    final revisoes = <Revisao>[];
-    final id = tarefa.id;
-    if (id == null) return revisoes;
-
-    revisoes.add(
-      Revisao(
-        tarefaId: id,
-        tipo: '7d',
-        dataPrevista: tarefa.rev7d ?? base.add(const Duration(days: 7)),
-        status: 'pendente',
-      ),
-    );
-    revisoes.add(
-      Revisao(
-        tarefaId: id,
-        tipo: '30d',
-        dataPrevista: tarefa.rev30d ?? base.add(const Duration(days: 30)),
-        status: 'pendente',
-      ),
-    );
-    revisoes.add(
-      Revisao(
-        tarefaId: id,
-        tipo: '60d',
-        dataPrevista: tarefa.rev60d ?? base.add(const Duration(days: 60)),
-        status: 'pendente',
-      ),
-    );
-
-    return revisoes;
-  }
+  // ---------------- helpers ----------------
 
   String _decode(Uint8List bytes) {
     try {
-      return const Utf8Decoder(allowMalformed: true).convert(bytes);
+      return utf8.decode(bytes);
     } catch (_) {
       return latin1.decode(bytes);
     }
   }
 
-  String _detectDelimiter(String text) {
-    final lines = text.split(RegExp(r'\r?\n'));
-    final sample = lines.take(5).join('\n');
-    final commas = _countChar(sample, ',');
-    final semicolons = _countChar(sample, ';');
-    return semicolons > commas ? ';' : ',';
+  String _detectDelimiter(String content) {
+    final sample = content.split('\n').take(5).join('\n');
+    final semi = ';'.allMatches(sample).length;
+    final comma = ','.allMatches(sample).length;
+    return semi >= comma ? ';' : ',';
   }
 
-  int _countChar(String text, String char) {
-    var count = 0;
-    for (var i = 0; i < text.length; i++) {
-      if (text[i] == char) count++;
+  int _findHeaderRow(List<List<dynamic>> rows) {
+    for (var i = 0; i < rows.length && i < 80; i++) {
+      final s = rows[i]
+          .map((e) => (e?.toString() ?? '').toLowerCase())
+          .join('|');
+      if (s.contains('disciplina') &&
+          s.contains('tarefa') &&
+          (s.contains('ch') || s.contains('c/h'))) {
+        return i;
+      }
     }
-    return count;
+    return -1;
   }
 
-  int _findHeaderIndex(List<List<dynamic>> rows) {
-    var bestIndex = -1;
-    var bestScore = 0;
-    final limit = rows.length < 10 ? rows.length : 10;
-
-    for (var i = 0; i < limit; i++) {
-      final row = rows[i];
-      var score = 0;
-      for (final cell in row) {
-        final header = cell?.toString() ?? '';
-        if (_mapHeader(header) != null) score++;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = i;
-      }
-    }
-
-    return bestScore >= 2 ? bestIndex : -1;
+  bool _rowEmpty(List row) {
+    return row.every((e) => (e?.toString().trim() ?? '').isEmpty);
   }
 
-  Map<String, int> _buildHeaderMap(List<dynamic> headerRow) {
-    final map = <String, int>{};
-    for (var i = 0; i < headerRow.length; i++) {
-      final raw = headerRow[i]?.toString() ?? '';
-      final key = _mapHeader(raw);
-      if (key != null && !map.containsKey(key)) {
-        map[key] = i;
-      }
-    }
-    return map;
-  }
-
-  String? _mapHeader(String header) {
-    final h = _normalize(header);
-
-    if (h.contains('rev') && h.contains('24')) return 'rev_24h';
-    if (h.contains('rev') && h.contains('7')) return 'rev_7d';
-    if (h.contains('rev') && h.contains('15')) return 'rev_15d';
-    if (h.contains('rev') && h.contains('30')) return 'rev_30d';
-    if (h.contains('rev') && h.contains('60')) return 'rev_60d';
-
-    if (h.contains('trilha')) return 'trilha';
-    if (h.contains('data')) return 'data_planejada';
-
-    if (h.contains('codigo') ||
-        (h.contains('cod') && h.contains('tarefa')) ||
-        h == 'cod') {
-      return 'tarefa_codigo';
-    }
-
-    if (h.contains('disciplina') || h.contains('materia')) {
-      return 'disciplina';
-    }
-
-    if (h.contains('descricao') || h.contains('assunto')) {
-      return 'descricao';
-    }
-
-    if (h.contains('ch') || h.contains('carga')) {
-      if (h.contains('planej') || h.contains('previst') || h.contains('plan')) {
-        return 'ch_planejada_min';
-      }
-      if (h.contains('efet') || h.contains('real')) {
-        return 'ch_efetiva_min';
-      }
-    }
-
-    if (h.contains('quest')) return 'questoes';
-    if (h.contains('acert')) return 'acertos';
-
-    if (h.contains('desempenho') ||
-        h.contains('aproveitamento') ||
-        h.contains('percent') ||
-        h.contains('%')) {
-      return 'desempenho';
-    }
-
-    return null;
-  }
-
-  String _normalize(String input) {
+  String _norm(String input) {
     var s = input.trim().toLowerCase();
     s = s
         .replaceAll(RegExp(r'[áàãâä]'), 'a')
@@ -304,132 +190,83 @@ class TrilhaImporter {
         .replaceAll(RegExp(r'[íìîï]'), 'i')
         .replaceAll(RegExp(r'[óòõôö]'), 'o')
         .replaceAll(RegExp(r'[úùûü]'), 'u')
-        .replaceAll(RegExp(r'ç'), 'c');
-    s = s.replaceAll(RegExp(r'[^a-z0-9%]+'), ' ');
+        .replaceAll('ç', 'c');
+    s = s.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    s = s.replaceAll(RegExp(r'_+'), '_');
+    return s.replaceAll(RegExp(r'^_|_$'), '');
+  }
+
+  String? _value(Map<String, int> idx, List row, String key) {
+    final k = _norm(key);
+    final i = idx[k];
+    if (i == null || i >= row.length) return null;
+    final v = row[i]?.toString();
+    return v?.trim().isEmpty == true ? null : v?.trim();
+  }
+
+  int? _parseInt(String? v) {
+    if (v == null) return null;
+    final s = v.replaceAll(RegExp(r'[^0-9-]'), '').trim();
+    return s.isEmpty ? null : int.tryParse(s);
+  }
+
+  double? _parseDouble(String? v) {
+    if (v == null) return null;
+    final s = v.replaceAll('%', '').replaceAll(',', '.').trim();
+    return s.isEmpty ? null : double.tryParse(s);
+  }
+
+  DateTime? _parseDate(String? v) {
+    if (v == null) return null;
+    final s = v.trim();
+    if (s.isEmpty) return null;
+
+    final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{2,4})$').firstMatch(s);
+    if (m != null) {
+      final d = int.parse(m.group(1)!);
+      final mo = int.parse(m.group(2)!);
+      var y = int.parse(m.group(3)!);
+      if (y < 100) y += 2000;
+      return DateTime(y, mo, d);
+    }
+
+    return DateTime.tryParse(s);
+  }
+
+  int? _parseMinutos(String? v) {
+    if (v == null) return null;
+    final s = v.trim();
+    if (s.isEmpty) return null;
+
+    final hm = RegExp(r'^(\d+):(\d{1,2})$').firstMatch(s);
+    if (hm != null) {
+      final h = int.parse(hm.group(1)!);
+      final m = int.parse(hm.group(2)!);
+      return h * 60 + m;
+    }
+
+    return int.tryParse(s);
+  }
+
+  double? _normalizeDesempenho(double? d, {int? questoes, int? acertos}) {
+    if (d == null) {
+      if (questoes != null && questoes > 0 && acertos != null) {
+        return (acertos / questoes).clamp(0.0, 1.0);
+      }
+      return null;
+    }
+    if (d > 1.0) {
+      if (d <= 100.0) return (d / 100.0).clamp(0.0, 1.0);
+      return 1.0;
+    }
+    return d.clamp(0.0, 1.0);
+  }
+
+  String _normalizarNomeDisciplina(String s) {
+    final n = _norm(s).replaceAll('_', '');
+    if (n == 'rlm' || n.contains('raciociniologico')) {
+      return 'Raciocínio Lógico';
+    }
     return s.trim();
-  }
-
-  String? _valueByKey(
-    List<dynamic> row,
-    Map<String, int> headerMap,
-    String key,
-  ) {
-    final idx = headerMap[key];
-    if (idx == null || idx >= row.length) return null;
-    final value = row[idx];
-    if (value == null) return null;
-    final text = value.toString().trim();
-    return text.isEmpty ? null : text;
-  }
-
-  bool _isRowEmpty(List<dynamic> row) {
-    for (final cell in row) {
-      if (cell != null && cell.toString().trim().isNotEmpty) return false;
-    }
-    return true;
-  }
-
-  Map<String, dynamic> _extractExtras(
-    List<dynamic> row,
-    List<String> rawHeaders,
-    Set<int> usedIndexes,
-  ) {
-    final extras = <String, dynamic>{};
-    for (var i = 0; i < row.length && i < rawHeaders.length; i++) {
-      if (usedIndexes.contains(i)) continue;
-      final header = rawHeaders[i].trim();
-      if (header.isEmpty) continue;
-      final value = row[i];
-      if (value == null) continue;
-      final text = value.toString().trim();
-      if (text.isEmpty) continue;
-      extras[header] = text;
-    }
-    return extras;
-  }
-
-  DateTime? _parseDate(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final raw = value.trim();
-
-    final numeric = double.tryParse(raw.replaceAll(',', '.'));
-    if (numeric != null && numeric > 1000) {
-      final base = DateTime(1899, 12, 30);
-      return base.add(Duration(days: numeric.round()));
-    }
-
-    if (raw.contains('/')) {
-      final parts = raw.split('/');
-      if (parts.length >= 2) {
-        final day = int.tryParse(parts[0]);
-        final month = int.tryParse(parts[1]);
-        final year = parts.length >= 3
-            ? int.tryParse(parts[2])
-            : DateTime.now().year;
-        if (day != null && month != null && year != null) {
-          return DateTime(year, month, day);
-        }
-      }
-    }
-
-    return DateTime.tryParse(raw);
-  }
-
-  int? _parseMinutos(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final raw = value.trim();
-
-    if (raw.contains(':')) {
-      final parts = raw.split(':');
-      if (parts.length >= 2) {
-        final h = int.tryParse(parts[0]) ?? 0;
-        final m = int.tryParse(parts[1]) ?? 0;
-        return (h * 60) + m;
-      }
-    }
-
-    final normalized = raw.replaceAll(',', '.');
-    final number = double.tryParse(normalized);
-    if (number == null) return null;
-    if (raw.contains('.') || raw.contains(',')) {
-      return (number * 60).round();
-    }
-    return number.round();
-  }
-
-  int? _parseInt(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    return int.tryParse(value.replaceAll(RegExp(r'[^0-9-]'), ''));
-  }
-
-  double? _parseDouble(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final normalized = value.replaceAll(',', '.').replaceAll('%', '');
-    final number = double.tryParse(normalized);
-    if (number == null) return null;
-    if (number > 1 && number <= 100) {
-      return number / 100;
-    }
-    return number;
-  }
-
-  String _hashRow(List<dynamic> row) {
-    final buffer = StringBuffer();
-    for (final cell in row) {
-      buffer.write(cell?.toString().trim() ?? '');
-      buffer.write('|');
-    }
-    return _fnv1a64(buffer.toString());
-  }
-
-  String _fnv1a64(String input) {
-    const fnvPrime = 1099511628211;
-    var hash = 1469598103934665603;
-    for (final codeUnit in input.codeUnits) {
-      hash ^= codeUnit;
-      hash = (hash * fnvPrime) & 0xFFFFFFFFFFFFFFFF;
-    }
-    final unsigned = hash.toUnsigned(64);
-    return unsigned.toRadixString(16).padLeft(16, '0');
   }
 }

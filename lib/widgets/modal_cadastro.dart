@@ -3,11 +3,11 @@ import '../models/sessao_estudo.dart';
 import '../database/db_helper.dart';
 
 class ModalCadastro extends StatefulWidget {
-  final Function onSave;
-  ModalCadastro({required this.onSave});
+  final VoidCallback onSave;
+  const ModalCadastro({super.key, required this.onSave});
 
   @override
-  _ModalCadastroState createState() => _ModalCadastroState();
+  State<ModalCadastro> createState() => _ModalCadastroState();
 }
 
 class _ModalCadastroState extends State<ModalCadastro> {
@@ -18,7 +18,9 @@ class _ModalCadastroState extends State<ModalCadastro> {
     final materia = _materiaController.text;
     final minutos = int.tryParse(_minutosController.text) ?? 0;
 
-    if (materia.isEmpty || minutos <= 0) return;
+    if (materia.isEmpty || minutos <= 0) {
+      return;
+    }
 
     final novaSessao = SessaoEstudo(
       materia: materia,
@@ -27,6 +29,11 @@ class _ModalCadastroState extends State<ModalCadastro> {
     );
 
     await DbHelper.instance.inserirSessao(novaSessao);
+
+    if (!mounted) {
+      return;
+    }
+
     widget.onSave(); // Avisa a tela inicial para atualizar a lista
     Navigator.of(context).pop(); // Fecha o modal
   }
@@ -50,6 +57,7 @@ class _ModalCadastroState extends State<ModalCadastro> {
             keyboardType: TextInputType.number,
           ),
           SizedBox(height: 20),
+          // ignore: sort_child_properties_last
           ElevatedButton(
             onPressed: _confirmar,
             child: Text('Salvar Sessão'),

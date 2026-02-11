@@ -2,26 +2,32 @@ import '../models/revisao.dart';
 import 'db_helper.dart';
 
 class RevisoesDao {
-  Future<List<int>> inserirEmLote(List<Revisao> revisoes) async {
+  Future<void> inserirEmLote(List<Revisao> revisoes) async {
     final db = await DbHelper.instance.database;
     final batch = db.batch();
-    for (final revisao in revisoes) {
-      batch.insert('revisoes', revisao.toMap());
+    for (final r in revisoes) {
+      batch.insert('revisoes', r.toMap());
     }
-    final result = await batch.commit(noResult: false);
-    return result.map((e) => e as int).toList();
+    await batch.commit(noResult: true);
   }
 
   Future<List<Revisao>> listarPorData(DateTime data) async {
     final db = await DbHelper.instance.database;
     final key = _dateKey(data);
+
     final result = await db.query(
       'revisoes',
       where: 'data_prevista LIKE ?',
       whereArgs: ['$key%'],
       orderBy: 'data_prevista ASC',
     );
+
     return result.map((json) => Revisao.fromMap(json)).toList();
+  }
+
+  Future<void> limparPorTarefa(int tarefaId) async {
+    final db = await DbHelper.instance.database;
+    await db.delete('revisoes', where: 'tarefa_id = ?', whereArgs: [tarefaId]);
   }
 
   Future<void> limparTudo() async {

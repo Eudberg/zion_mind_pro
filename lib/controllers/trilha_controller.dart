@@ -8,6 +8,7 @@ import '../data/trilha_importer.dart';
 import '../database/plano_diario_dao.dart';
 import '../database/revisoes_dao.dart';
 import '../database/tarefas_trilha_dao.dart';
+import '../models/disciplina.dart';
 import '../models/plano_item.dart';
 import '../models/revisao.dart';
 import '../models/tarefa_trilha.dart';
@@ -29,42 +30,71 @@ class TrilhaController extends ChangeNotifier {
     TarefasTrilhaDao? tarefasDao,
     PlanoDiarioDao? planoDao,
     RevisoesDao? revisoesDao,
-  })  : _tarefasDao = tarefasDao ?? TarefasTrilhaDao(),
-        _planoDao = planoDao ?? PlanoDiarioDao(),
-        _revisoesDao = revisoesDao ?? RevisoesDao();
+  }) : _tarefasDao = tarefasDao ?? TarefasTrilhaDao(),
+       _planoDao = planoDao ?? PlanoDiarioDao(),
+       _revisoesDao = revisoesDao ?? RevisoesDao();
 
-  int get totalMinutosPlanejados {
-    return tarefas.fold(0, (acc, t) => acc + (t.chPlanejadaMin ?? 0));
-  }
-
-  int get totalMinutosEfetivos {
-    return tarefas.fold(0, (acc, t) => acc + (t.chEfetivaMin ?? 0));
-  }
-
-  int get diasAtivos {
-    final datas = <String>{};
-    for (final t in tarefas) {
-      if ((t.chEfetivaMin ?? 0) > 0 && t.dataPlanejada != null) {
-        datas.add(_dateKey(t.dataPlanejada!));
-      }
-    }
-    return datas.length;
-  }
-
-  double get progresso {
-    final planejado = totalMinutosPlanejados;
-    if (planejado == 0) return 0;
-    return (totalMinutosEfetivos / planejado).clamp(0.0, 1.0);
+  Future<void> carregarTarefas() async {
+    tarefas = await _tarefasDao.listarTodas();
+    notifyListeners();
   }
 
   Map<int, TarefaTrilha> get tarefasPorId {
     final map = <int, TarefaTrilha>{};
     for (final t in tarefas) {
-      if (t.id != null) {
-        map[t.id!] = t;
+      final id = t.id;
+      if (id == null) {
+        continue;
       }
+      map[id] = t;
     }
     return map;
+  }
+
+  int get totalMinutosPlanejados =>
+      tarefas.fold(0, (acc, t) => acc + (t.chPlanejadaMin ?? 0));
+
+  int get totalMinutosEfetivos =>
+      tarefas.fold(0, (acc, t) => acc + (t.chEfetivaMin ?? 0));
+
+  int get diasAtivos {
+    final dias = <String>{};
+    for (final t in tarefas) {
+      final minEfetivos = t.chEfetivaMin ?? 0;
+      if (!t.concluida && minEfetivos <= 0) {
+        continue;
+      }
+      final d = t.dataPlanejada;
+      if (d == null) {
+        continue;
+      }
+      final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+      dias.add(key);
+    }
+    return dias.length;
+  }
+
+  // Dashboard por disciplina (progresso por tarefas concluídas)
+  List<Disciplina> get disciplinasDoCsv {
+    final total = <String, int>{};
+    final done = <String, int>{};
+
+    for (final t in tarefas) {
+      final nome = (t.disciplina ?? '').trim();
+      if (nome.isEmpty) continue;
+      total[nome] = (total[nome] ?? 0) + 1;
+      if (t.concluida) done[nome] = (done[nome] ?? 0) + 1;
+    }
+
+    final nomes = total.keys.toList()..sort();
+    return nomes.map((nome) {
+      return Disciplina.fromTarefas(
+        nome: nome,
+        totalTarefas: total[nome] ?? 0,
+        tarefasConcluidas: done[nome] ?? 0,
+      );
+    }).toList();
   }
 
   Future<void> importarCsv() async {
@@ -90,13 +120,11 @@ class TrilhaController extends ChangeNotifier {
       if (bytes == null && path != null) {
         bytes = await File(path).readAsBytes();
       }
-
-      if (bytes == null) {
-        throw Exception('Nao foi possivel ler o arquivo.');
-      }
+      if (bytes == null) throw Exception('Nao foi possivel ler o arquivo.');
 
       final importer = TrilhaImporter();
       tarefas = await importer.importarBytes(bytes, limparAntes: true);
+
       await gerarPlanoDoDia(data: DateTime.now());
     } catch (e) {
       erro = e.toString();
@@ -106,11 +134,7 @@ class TrilhaController extends ChangeNotifier {
     }
   }
 
-  Future<void> carregarTarefas() async {
-    tarefas = await _tarefasDao.listarTodas();
-    notifyListeners();
-  }
-
+  // ✅ planejamento estável com pendências acumuladas
   Future<void> gerarPlanoDoDia({DateTime? data}) async {
     final alvo = _dateOnly(data ?? DateTime.now());
     dataSelecionada = alvo;
@@ -119,13 +143,14 @@ class TrilhaController extends ChangeNotifier {
       tarefas = await _tarefasDao.listarTodas();
     }
 
-    final tarefasDia = await _tarefasDao.listarPorData(alvo);
+    final pendentes = await _tarefasDao.listarPendentesAte(alvo);
     final revisoesDia = await _revisoesDao.listarPorData(alvo);
 
     await _planoDao.limparPorData(alvo);
 
     final itens = <PlanoItem>[];
-    for (final tarefa in tarefasDia) {
+
+    for (final tarefa in pendentes) {
       itens.add(
         PlanoItem(
           data: alvo,
@@ -158,22 +183,90 @@ class TrilhaController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<Revisao>> listarRevisoesDoDia({DateTime? data}) async {
-    final alvo = _dateOnly(data ?? DateTime.now());
-    revisoesDoDia = await _revisoesDao.listarPorData(alvo);
-    notifyListeners();
-    return revisoesDoDia;
+  // usado pela sua TelaTrilha (checkbox)
+  Future<void> alternarConcluida(TarefaTrilha tarefa, bool value) async {
+    if (tarefa.id == null) return;
+
+    await _tarefasDao.marcarConcluida(tarefa.id!, value);
+
+    // se concluiu agora, gera revisões 7/30/60 a partir de hoje
+    if (value) {
+      await _revisoesDao.limparPorTarefa(tarefa.id!);
+
+      final hoje = _dateOnly(DateTime.now());
+      final revisoes = <Revisao>[
+        Revisao(
+          tarefaId: tarefa.id!,
+          tipo: '7d',
+          dataPrevista: hoje.add(const Duration(days: 7)),
+          status: 'pendente',
+        ),
+        Revisao(
+          tarefaId: tarefa.id!,
+          tipo: '30d',
+          dataPrevista: hoje.add(const Duration(days: 30)),
+          status: 'pendente',
+        ),
+        Revisao(
+          tarefaId: tarefa.id!,
+          tipo: '60d',
+          dataPrevista: hoje.add(const Duration(days: 60)),
+          status: 'pendente',
+        ),
+      ];
+      await _revisoesDao.inserirEmLote(revisoes);
+    }
+
+    await carregarTarefas();
+    await gerarPlanoDoDia(data: dataSelecionada);
   }
 
-  DateTime _dateOnly(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
+  // usado pela tela de detalhe (questões/acertos/fonte/concluída)
+  Future<void> atualizarTarefaCampos({
+    required int tarefaId,
+    int? questoes,
+    int? acertos,
+    String? fonteQuestoes,
+    bool? concluida,
+  }) async {
+    await _tarefasDao.atualizarCampos(
+      tarefaId: tarefaId,
+      questoes: questoes,
+      acertos: acertos,
+      fonteQuestoes: fonteQuestoes,
+      concluida: concluida,
+    );
+
+    // se concluiu via detalhe, gera revisões
+    if (concluida == true) {
+      await _revisoesDao.limparPorTarefa(tarefaId);
+      final hoje = _dateOnly(DateTime.now());
+      await _revisoesDao.inserirEmLote([
+        Revisao(
+          tarefaId: tarefaId,
+          tipo: '7d',
+          dataPrevista: hoje.add(const Duration(days: 7)),
+          status: 'pendente',
+        ),
+        Revisao(
+          tarefaId: tarefaId,
+          tipo: '30d',
+          dataPrevista: hoje.add(const Duration(days: 30)),
+          status: 'pendente',
+        ),
+        Revisao(
+          tarefaId: tarefaId,
+          tipo: '60d',
+          dataPrevista: hoje.add(const Duration(days: 60)),
+          status: 'pendente',
+        ),
+      ]);
+    }
+
+    await carregarTarefas();
+    await gerarPlanoDoDia(data: dataSelecionada);
   }
 
-  String _dateKey(DateTime data) {
-    final d = _dateOnly(data);
-    final y = d.year.toString().padLeft(4, '0');
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '$y-$m-$day';
-  }
+  DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
 }

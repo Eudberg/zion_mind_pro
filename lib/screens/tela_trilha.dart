@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/trilha_controller.dart';
 import '../models/tarefa_trilha.dart';
-import 'tela_planejamento_dia.dart';
+import 'tarefa_trilha_detalhe.dart';
 
 class TelaTrilha extends StatefulWidget {
   const TelaTrilha({super.key});
@@ -14,251 +13,255 @@ class TelaTrilha extends StatefulWidget {
 }
 
 class _TelaTrilhaState extends State<TelaTrilha> {
-  final _dateFormat = DateFormat('dd/MM/yyyy');
-
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => context.read<TrilhaController>().carregarTarefas(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<TrilhaController>().carregarTarefas();
+    });
+  }
+
+  String _grupoKey(TarefaTrilha t) {
+    final og = t.ordemGlobal;
+    if (og != null && og > 0) {
+      final trilhaIndex = (og - 1) ~/ 25;
+      return 'TRILHA $trilhaIndex';
+    }
+    return (t.trilha ?? 'SEM TRILHA').toUpperCase();
+  }
+
+  int _grupoOrder(String key) {
+    final m = RegExp(r'(\d+)').firstMatch(key);
+    if (m != null) return int.parse(m.group(1)!);
+    return 9999;
+  }
+
+  int _ordem(TarefaTrilha t) =>
+      (t.ordemGlobal != null && t.ordemGlobal! > 0) ? t.ordemGlobal! : 999999;
+
+  String _posNaTrilha(TarefaTrilha t) {
+    final og = t.ordemGlobal;
+    if (og != null && og > 0) return '${((og - 1) % 25) + 1}';
+    return t.tarefaCodigo ?? '—';
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = context.watch<TrilhaController>();
+    final tarefas = controller.tarefas;
+
+    final Map<String, List<TarefaTrilha>> grupos = {};
+    for (final t in tarefas) {
+      final k = _grupoKey(t);
+      grupos.putIfAbsent(k, () => []).add(t);
+    }
+
+    final chaves = grupos.keys.toList()
+      ..sort((a, b) => _grupoOrder(a).compareTo(_grupoOrder(b)));
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
-        title: const Text('Trilha Estrategica'),
+        title: const Text('Trilha Estratégica'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.today),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const TelaPlanejamentoDia(),
-                ),
-              );
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Recarregar',
+            onPressed: () => controller.carregarTarefas(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Importar CSV',
+            onPressed: () async {
+              await controller.importarCsv();
+              if (mounted) await controller.carregarTarefas();
             },
           ),
         ],
       ),
-      body: Consumer<TrilhaController>(
-        builder: (context, controller, _) {
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+      body: tarefas.isEmpty
+          ? const Center(child: Text('Importe uma trilha (CSV) para começar.'))
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: controller.carregando
-                            ? null
-                            : () => controller.importarCsv(),
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Importar CSV'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      onPressed: controller.carregando
-                          ? null
-                          : () => controller.carregarTarefas(),
-                      icon: const Icon(Icons.refresh),
-                    ),
-                  ],
-                ),
-                if (controller.erro != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    controller.erro!,
-                    style: const TextStyle(color: Colors.redAccent),
+                for (final key in chaves) ...[
+                  _GrupoHeader(titulo: key, total: grupos[key]!.length),
+                  const SizedBox(height: 8),
+                  _GrupoLista(
+                    tarefas: (grupos[key]!
+                      ..sort((a, b) => _ordem(a).compareTo(_ordem(b)))),
+                    posNaTrilha: _posNaTrilha,
+                    ordemGlobal: _ordem,
                   ),
+                  const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 12),
-                Expanded(
-                  child: _buildLista(controller),
-                ),
               ],
             ),
-          );
-        },
-      ),
     );
-  }
-
-  Widget _buildLista(TrilhaController controller) {
-    if (controller.carregando) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (controller.tarefas.isEmpty) {
-      return const Center(
-        child: Text(
-          'Nenhuma tarefa importada ainda.',
-          style: TextStyle(fontSize: 16),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      itemCount: controller.tarefas.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final tarefa = controller.tarefas[index];
-        return _buildCard(tarefa);
-      },
-    );
-  }
-
-  Widget _buildCard(TarefaTrilha tarefa) {
-    final data = tarefa.dataPlanejada != null
-        ? _dateFormat.format(tarefa.dataPlanejada!)
-        : 'Sem data';
-    final minutos = tarefa.chPlanejadaMin?.toString() ?? '--';
-    final disciplina = tarefa.disciplina ?? 'Sem disciplina';
-    final descricao = tarefa.descricao ?? 'Sem descricao';
-
-    return InkWell(
-      onTap: () => _mostrarDetalhes(tarefa),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.08),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              disciplina,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              descricao,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _InfoChip(label: data, icon: Icons.event),
-                const SizedBox(width: 8),
-                _InfoChip(label: '$minutos min', icon: Icons.timer),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _mostrarDetalhes(TarefaTrilha tarefa) {
-    final campos = _camposDetalhe(tarefa);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF111827),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: ListView.separated(
-            itemCount: campos.length,
-            separatorBuilder: (_, __) => const Divider(height: 24),
-            itemBuilder: (context, index) {
-              final item = campos[index];
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.key,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.value,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  List<MapEntry<String, String>> _camposDetalhe(TarefaTrilha tarefa) {
-    String format(DateTime? d) =>
-        d == null ? '-' : _dateFormat.format(d);
-
-    return [
-      MapEntry('Trilha', tarefa.trilha ?? '-'),
-      MapEntry('Data planejada', format(tarefa.dataPlanejada)),
-      MapEntry('Codigo', tarefa.tarefaCodigo ?? '-'),
-      MapEntry('Disciplina', tarefa.disciplina ?? '-'),
-      MapEntry('Descricao', tarefa.descricao ?? '-'),
-      MapEntry('CH planejada (min)', tarefa.chPlanejadaMin?.toString() ?? '-'),
-      MapEntry('CH efetiva (min)', tarefa.chEfetivaMin?.toString() ?? '-'),
-      MapEntry('Questoes', tarefa.questoes?.toString() ?? '-'),
-      MapEntry('Acertos', tarefa.acertos?.toString() ?? '-'),
-      MapEntry(
-        'Desempenho',
-        tarefa.desempenho != null
-            ? '${(tarefa.desempenho! * 100).toStringAsFixed(1)}%'
-            : '-',
-      ),
-      MapEntry('Revisao 24h', format(tarefa.rev24h)),
-      MapEntry('Revisao 7d', format(tarefa.rev7d)),
-      MapEntry('Revisao 15d', format(tarefa.rev15d)),
-      MapEntry('Revisao 30d', format(tarefa.rev30d)),
-      MapEntry('Revisao 60d', format(tarefa.rev60d)),
-      MapEntry('Extras', tarefa.jsonExtra ?? '-'),
-      MapEntry('Hash', tarefa.hashLinha ?? '-'),
-    ];
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
+class _GrupoHeader extends StatelessWidget {
+  final String titulo;
+  final int total;
+  const _GrupoHeader({required this.titulo, required this.total});
 
-  const _InfoChip({
-    required this.label,
-    required this.icon,
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(titulo, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text('$total'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GrupoLista extends StatelessWidget {
+  final List<TarefaTrilha> tarefas;
+  final String Function(TarefaTrilha) posNaTrilha;
+  final int Function(TarefaTrilha) ordemGlobal;
+
+  const _GrupoLista({
+    required this.tarefas,
+    required this.posNaTrilha,
+    required this.ordemGlobal,
   });
+
+  String _fmtDate(DateTime? d) {
+    if (d == null) return 'Sem data';
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yy = d.year.toString();
+    return '$dd/$mm/$yy';
+  }
+
+  String _fmtMin(int? min) {
+    if (min == null) return '-- min';
+    return '$min min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.read<TrilhaController>();
+
+    return Column(
+      children: tarefas.map((t) {
+        final titulo = (t.disciplina ?? 'Sem disciplina').toUpperCase();
+        final desc = (t.descricao ?? 'Sem descrição').trim();
+        final isSpecial = t.isDescanso || t.isLimparErros;
+
+        final og = ordemGlobal(t);
+        final pos = posNaTrilha(t);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () async {
+                final changed = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TarefaTrilhaDetalhe(tarefa: t),
+                  ),
+                );
+                if (changed == true) {
+                  await controller.carregarTarefas();
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      isSpecial ? Icons.bedtime : Icons.assignment_outlined,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            titulo,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            desc.isEmpty ? '—' : desc,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _Pill(icon: Icons.numbers, text: 'T$pos • #$og'),
+                              _Pill(
+                                icon: Icons.calendar_today,
+                                text: _fmtDate(t.dataPlanejada),
+                              ),
+                              _Pill(
+                                icon: Icons.timer,
+                                text: _fmtMin(t.chPlanejadaMin),
+                              ),
+                              if (t.concluida)
+                                const _Pill(
+                                  icon: Icons.check_circle,
+                                  text: 'Concluída',
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Checkbox(
+                      value: t.concluida,
+                      onChanged: (v) =>
+                          controller.alternarConcluida(t, v ?? false),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _Pill({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(20),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
-        children: [
-          Icon(icon, size: 14),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
+        mainAxisSize: MainAxisSize.min,
+        children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(text)],
       ),
     );
   }

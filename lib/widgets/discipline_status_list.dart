@@ -41,7 +41,7 @@ class DisciplineStatusList extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: cor.withOpacity(0.15),
+              color: cor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(status, style: TextStyle(color: cor, fontSize: 12)),

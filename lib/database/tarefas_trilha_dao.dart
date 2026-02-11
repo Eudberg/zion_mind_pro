@@ -2,11 +2,6 @@ import '../models/tarefa_trilha.dart';
 import 'db_helper.dart';
 
 class TarefasTrilhaDao {
-  Future<int> inserir(TarefaTrilha tarefa) async {
-    final db = await DbHelper.instance.database;
-    return db.insert('tarefas_trilha', tarefa.toMap());
-  }
-
   Future<List<int>> inserirEmLote(List<TarefaTrilha> tarefas) async {
     final db = await DbHelper.instance.database;
     final batch = db.batch();
@@ -21,7 +16,7 @@ class TarefasTrilhaDao {
     final db = await DbHelper.instance.database;
     final result = await db.query(
       'tarefas_trilha',
-      orderBy: 'data_planejada ASC',
+      orderBy: 'ordem_global ASC',
     );
     return result.map((json) => TarefaTrilha.fromMap(json)).toList();
   }
@@ -33,9 +28,60 @@ class TarefasTrilhaDao {
       'tarefas_trilha',
       where: 'data_planejada LIKE ?',
       whereArgs: ['$key%'],
-      orderBy: 'data_planejada ASC',
+      orderBy: 'ordem_global ASC',
     );
     return result.map((json) => TarefaTrilha.fromMap(json)).toList();
+  }
+
+  // ✅ pendências acumuladas: data_planejada <= hoje AND concluida=0
+  Future<List<TarefaTrilha>> listarPendentesAte(DateTime data) async {
+    final db = await DbHelper.instance.database;
+    final key = _dateKey(data);
+    final result = await db.query(
+      'tarefas_trilha',
+      where:
+          "(data_planejada IS NOT NULL AND data_planejada <= ?) AND concluida = 0",
+      whereArgs: ['${key}T23:59:59.999'],
+      orderBy: 'data_planejada ASC, ordem_global ASC',
+    );
+    return result.map((json) => TarefaTrilha.fromMap(json)).toList();
+  }
+
+  Future<void> marcarConcluida(int tarefaId, bool concluida) async {
+    final db = await DbHelper.instance.database;
+    await db.update(
+      'tarefas_trilha',
+      {'concluida': concluida ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [tarefaId],
+    );
+  }
+
+  Future<void> atualizarCampos({
+    required int tarefaId,
+    int? questoes,
+    int? acertos,
+    String? fonteQuestoes,
+    bool? concluida,
+    int? chEfetivaMin,
+  }) async {
+    final db = await DbHelper.instance.database;
+    final values = <String, dynamic>{};
+
+    if (questoes != null) values['questoes'] = questoes;
+    if (acertos != null) values['acertos'] = acertos;
+    if (fonteQuestoes != null) values['fonte_questoes'] = fonteQuestoes;
+    if (concluida != null) values['concluida'] = concluida ? 1 : 0;
+    if (chEfetivaMin != null) values['ch_efetiva_min'] = chEfetivaMin;
+
+    if (values.isEmpty) return;
+
+    await db.update(
+      'tarefas_trilha',
+      values,
+      where: 'id = ?',
+      whereArgs: [tarefaId],
+    );
   }
 
   Future<void> limparTudo() async {
