@@ -1,125 +1,64 @@
-import 'dart:typed_data';
-
-import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 
 import '../data/trilha_importer.dart';
 import '../database/tarefas_trilha_dao.dart';
-import '../database/revisoes_dao.dart';
 import '../models/tarefa_trilha.dart';
-import '../models/plano_item.dart';
-import '../models/revisao.dart';
 
 class TrilhaController extends ChangeNotifier {
-  final _tarefasDao = TarefasTrilhaDao();
-  final _revisoesDao = RevisoesDao();
-  final _importer = TrilhaImporter();
+  final TarefasTrilhaDao _dao = TarefasTrilhaDao();
+  final TrilhaImporter _importer = TrilhaImporter();
 
   List<TarefaTrilha> _tarefas = [];
   List<TarefaTrilha> get tarefas => _tarefas;
 
-  // Dia selecionado no “Planejamento do Dia”
-  DateTime dataSelecionada = _dateOnly(DateTime.now());
-
-  // Itens do dia
-  List<PlanoItem> _planoDoDia = [];
-  List<PlanoItem> get planoDoDia => _planoDoDia;
-
-  // Revisões do dia (7/30/60)
-  List<Revisao> _revisoesDoDia = [];
-  List<Revisao> get revisoesDoDia => _revisoesDoDia;
+  bool _carregando = false;
+  bool get carregando => _carregando;
 
   Future<void> carregarTarefas() async {
-    _tarefas = await _tarefasDao.listarTodas();
+    _carregando = true;
     notifyListeners();
+
+    try {
+      _tarefas = await _dao.listarTodas();
+    } finally {
+      _carregando = false;
+      notifyListeners();
+    }
   }
 
   Future<void> importarCsv() async {
-    final res = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv'],
+      allowedExtensions: const ['csv'],
       withData: true,
     );
 
-    if (res == null || res.files.isEmpty) return;
+    if (result == null || result.files.isEmpty) return;
 
-    final file = res.files.first;
+    final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null) return;
 
-    await importarCsvBytes(bytes);
-  }
+    final tarefasImportadas = await _importer.importarBytes(bytes);
 
-  Future<void> importarCsvBytes(Uint8List bytes) async {
-    final tarefas = await _importer.importarBytes(bytes);
+    // Se o import falhar (vazio), não apaga o banco
+    if (tarefasImportadas.isEmpty) return;
 
-    // Apaga trilha anterior (se você quiser “acumular”, troque isso)
-    await _tarefasDao.limparTudo();
-    await _revisoesDao.limparTudo();
-
-    // Insere em lote
-    await _tarefasDao.inserirEmLote(tarefas);
+    await _dao.limparTudo();
+    await _dao.inserirEmLote(tarefasImportadas);
 
     await carregarTarefas();
-    await gerarPlanoDoDia(data: dataSelecionada);
   }
 
   Future<void> alternarConcluida(TarefaTrilha tarefa, bool concluida) async {
-    if (tarefa.id == null) return;
+    final id = tarefa.id;
+    if (id == null) return;
 
-    await _tarefasDao.atualizarConcluida(tarefa.id!, concluida);
-
-    // Se marcou concluída, gera revisões 7/30/60; se desmarcou, limpa
-    await _revisoesDao.limparPorTarefa(tarefa.id!);
-
-    if (concluida) {
-      final hoje = _dateOnly(DateTime.now());
-      await _revisoesDao.inserirEmLote([
-        Revisao(
-          tarefaId: tarefa.id!,
-          tipo: '7d',
-          dataPrevista: hoje.add(const Duration(days: 7)),
-          status: 'pendente',
-        ),
-        Revisao(
-          tarefaId: tarefa.id!,
-          tipo: '30d',
-          dataPrevista: hoje.add(const Duration(days: 30)),
-          status: 'pendente',
-        ),
-        Revisao(
-          tarefaId: tarefa.id!,
-          tipo: '60d',
-          dataPrevista: hoje.add(const Duration(days: 60)),
-          status: 'pendente',
-        ),
-      ]);
-    }
-
+    await _dao.marcarConcluida(id, concluida);
     await carregarTarefas();
-    await gerarPlanoDoDia(data: dataSelecionada);
   }
 
-  Future<void> selecionarDia(DateTime dia) async {
-    dataSelecionada = _dateOnly(dia);
-    await gerarPlanoDoDia(data: dataSelecionada);
-  }
-
-  /// Planejamento do dia:
-  /// - tarefas com data_planejada == dia
-  /// - revisões previstas no dia (7/30/60)
-  Future<void> gerarPlanoDoDia({required DateTime data}) async {
-    final dia = _dateOnly(data);
-
-    final tarefasDoDia = await _tarefasDao.listarPorDataPlanejada(dia);
-    _planoDoDia = tarefasDoDia.map((t) => PlanoItem.fromTarefa(t)).toList();
-
-    _revisoesDoDia = await _revisoesDao.listarPorData(dia);
-
-    notifyListeners();
-  }
-
-  /// Usado pela tela de detalhe (questões/acertos/fonte/concluída).
   Future<void> atualizarTarefaCampos({
     required int tarefaId,
     int? questoes,
@@ -127,7 +66,7 @@ class TrilhaController extends ChangeNotifier {
     String? fonteQuestoes,
     bool? concluida,
   }) async {
-    await _tarefasDao.atualizarCampos(
+    await _dao.atualizarCampos(
       tarefaId: tarefaId,
       questoes: questoes,
       acertos: acertos,
@@ -135,37 +74,27 @@ class TrilhaController extends ChangeNotifier {
       concluida: concluida,
     );
 
-    // se concluiu via detalhe, gera revisões
-    if (concluida == true) {
-      await _revisoesDao.limparPorTarefa(tarefaId);
+    await carregarTarefas();
+  }
+    /// Disciplinas vindas do CSV (usadas na Tela Inicial)
+  List<String> get disciplinasDoCsv {
+    final set = <String>{};
 
-      final hoje = _dateOnly(DateTime.now());
-      await _revisoesDao.inserirEmLote([
-        Revisao(
-          tarefaId: tarefaId,
-          tipo: '7d',
-          dataPrevista: hoje.add(const Duration(days: 7)),
-          status: 'pendente',
-        ),
-        Revisao(
-          tarefaId: tarefaId,
-          tipo: '30d',
-          dataPrevista: hoje.add(const Duration(days: 30)),
-          status: 'pendente',
-        ),
-        Revisao(
-          tarefaId: tarefaId,
-          tipo: '60d',
-          dataPrevista: hoje.add(const Duration(days: 60)),
-          status: 'pendente',
-        ),
-      ]);
+    for (final t in tarefas) {
+      // <- já usa seu getter existente
+      final d = (t.disciplina ?? '').trim();
+      if (d.isEmpty) continue;
+
+      final norm = d.replaceAll(RegExp(r'\s+'), ' ').trim();
+      set.add(norm);
     }
 
-    await carregarTarefas();
-    await gerarPlanoDoDia(data: dataSelecionada);
+    final list = set.toList();
+    list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
   }
 
-  static DateTime _dateOnly(DateTime date) =>
-      DateTime(date.year, date.month, date.day);
+  /// alias opcional (caso alguma tela use "disciplinas")
+  List<String> get disciplinas => disciplinasDoCsv;
+
 }
