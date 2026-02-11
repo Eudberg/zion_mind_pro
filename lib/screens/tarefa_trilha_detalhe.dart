@@ -51,16 +51,22 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
     final acertos = _parseInt(_acertosCtrl.text);
 
     if (questoes != null && questoes < 0) {
-      return _toast('Questões não pode ser negativo.');
+      _toast('Questões não pode ser negativo.');
+      return;
     }
     if (acertos != null && acertos < 0) {
-      return _toast('Acertos não pode ser negativo.');
+      _toast('Acertos não pode ser negativo.');
+      return;
     }
     if (questoes != null && acertos != null && acertos > questoes) {
-      return _toast('Acertos não pode ser maior que Questões.');
+      _toast('Acertos não pode ser maior que Questões.');
+      return;
     }
 
-    if (widget.tarefa.id == null) return _toast('ID da tarefa não encontrado.');
+    if (widget.tarefa.id == null) {
+      _toast('ID da tarefa não encontrado.');
+      return;
+    }
 
     await context.read<TrilhaController>().atualizarTarefaCampos(
       tarefaId: widget.tarefa.id!,
@@ -80,9 +86,7 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
   @override
   Widget build(BuildContext context) {
     final t = widget.tarefa;
-
-    final desempenho = (t.desempenhoCalculado ?? 0.0).clamp(0.0, 1.0);
-    final desempenhoPct = '${(desempenho * 100).toStringAsFixed(0)}%';
+    final desempenho = t.desempenhoCalculado;
 
     return Scaffold(
       appBar: AppBar(
@@ -102,14 +106,12 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
           children: [
             _Header(tarefa: t),
             const SizedBox(height: 16),
-
             Text('Descrição', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             SelectableText(
               t.descricao?.trim().isNotEmpty == true ? t.descricao! : '—',
             ),
             const SizedBox(height: 16),
-
             Text('Questões', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Row(
@@ -138,7 +140,6 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
               ],
             ),
             const SizedBox(height: 12),
-
             Text(
               'Fonte das questões',
               style: Theme.of(context).textTheme.titleSmall,
@@ -163,7 +164,6 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
@@ -174,16 +174,15 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
                 'Ao concluir, serão geradas revisões em 7/30/60 dias.',
               ),
             ),
-
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: LinearProgressIndicator(value: desempenho)),
-                const SizedBox(width: 12),
-                Text(desempenhoPct),
-              ],
-            ),
-
+            if (desempenho != null)
+              Row(
+                children: [
+                  Expanded(child: LinearProgressIndicator(value: desempenho)),
+                  const SizedBox(width: 12),
+                  Text('${(desempenho * 100).toStringAsFixed(0)}%'),
+                ],
+              ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -246,7 +245,11 @@ class _Header extends StatelessWidget {
               children: [
                 Chip(
                   avatar: const Icon(Icons.tag, size: 18),
-                  label: Text(tarefa.tarefaCodigo ?? '—'),
+                  label: Text(
+                    tarefa.ordemGlobal != null
+                        ? '# ${tarefa.ordemGlobal}'
+                        : (tarefa.tarefaCodigo ?? '—'),
+                  ),
                 ),
                 Chip(
                   avatar: const Icon(Icons.calendar_today, size: 18),

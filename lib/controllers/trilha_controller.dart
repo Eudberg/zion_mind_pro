@@ -122,7 +122,7 @@ class TrilhaController extends ChangeNotifier {
       }
       if (bytes == null) throw Exception('Nao foi possivel ler o arquivo.');
 
-      final importer = TrilhaImporter();
+      final importer = TrilhaImporter(_tarefasDao);
       tarefas = await importer.importarBytes(bytes, limparAntes: true);
 
       await gerarPlanoDoDia(data: DateTime.now());

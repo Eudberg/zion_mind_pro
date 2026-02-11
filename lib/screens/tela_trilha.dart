@@ -16,21 +16,25 @@ class _TelaTrilhaState extends State<TelaTrilha> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      context.read<TrilhaController>().carregarTarefas();
-    });
+    Future.microtask(() => context.read<TrilhaController>().carregarTarefas());
   }
 
   String _grupoKey(TarefaTrilha t) {
+    // Regra principal: trilha = floor((ordemGlobal-1)/25)
     final og = t.ordemGlobal;
     if (og != null && og > 0) {
-      final trilhaIndex = (og - 1) ~/ 25;
-      return 'TRILHA $trilhaIndex';
+      final idx = (og - 1) ~/ 25; // 0,1,2...
+      return 'TRILHA $idx';
     }
-    return (t.trilha ?? 'SEM TRILHA').toUpperCase();
+
+    // Fallback: usa o campo "trilha" se existir
+    final raw = (t.trilha ?? '').trim();
+    if (raw.isEmpty) return 'SEM TRILHA';
+
+    final up = raw.toUpperCase();
+    final n = RegExp(r'(\d+)').firstMatch(up)?.group(1);
+    if (n != null) return 'TRILHA ${int.parse(n)}';
+    return up;
   }
 
   int _grupoOrder(String key) {
@@ -42,10 +46,10 @@ class _TelaTrilhaState extends State<TelaTrilha> {
   int _ordem(TarefaTrilha t) =>
       (t.ordemGlobal != null && t.ordemGlobal! > 0) ? t.ordemGlobal! : 999999;
 
-  String _posNaTrilha(TarefaTrilha t) {
+  String _codigoGlobal(TarefaTrilha t) {
     final og = t.ordemGlobal;
-    if (og != null && og > 0) return '${((og - 1) % 25) + 1}';
-    return t.tarefaCodigo ?? '—';
+    if (og == null || og <= 0) return '—';
+    return '# $og';
   }
 
   @override
@@ -53,6 +57,7 @@ class _TelaTrilhaState extends State<TelaTrilha> {
     final controller = context.watch<TrilhaController>();
     final tarefas = controller.tarefas;
 
+    // Agrupa por trilha
     final Map<String, List<TarefaTrilha>> grupos = {};
     for (final t in tarefas) {
       final k = _grupoKey(t);
@@ -92,7 +97,7 @@ class _TelaTrilhaState extends State<TelaTrilha> {
                   _GrupoLista(
                     tarefas: (grupos[key]!
                       ..sort((a, b) => _ordem(a).compareTo(_ordem(b)))),
-                    posNaTrilha: _posNaTrilha,
+                    codigoGlobal: _codigoGlobal,
                     ordemGlobal: _ordem,
                   ),
                   const SizedBox(height: 16),
@@ -129,12 +134,12 @@ class _GrupoHeader extends StatelessWidget {
 
 class _GrupoLista extends StatelessWidget {
   final List<TarefaTrilha> tarefas;
-  final String Function(TarefaTrilha) posNaTrilha;
+  final String Function(TarefaTrilha) codigoGlobal;
   final int Function(TarefaTrilha) ordemGlobal;
 
   const _GrupoLista({
     required this.tarefas,
-    required this.posNaTrilha,
+    required this.codigoGlobal,
     required this.ordemGlobal,
   });
 
@@ -148,7 +153,7 @@ class _GrupoLista extends StatelessWidget {
 
   String _fmtMin(int? min) {
     if (min == null) return '-- min';
-    return '$min min';
+    return '${min} min';
   }
 
   @override
@@ -159,10 +164,8 @@ class _GrupoLista extends StatelessWidget {
       children: tarefas.map((t) {
         final titulo = (t.disciplina ?? 'Sem disciplina').toUpperCase();
         final desc = (t.descricao ?? 'Sem descrição').trim();
+        final codigo = codigoGlobal(t);
         final isSpecial = t.isDescanso || t.isLimparErros;
-
-        final og = ordemGlobal(t);
-        final pos = posNaTrilha(t);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -210,7 +213,7 @@ class _GrupoLista extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              _Pill(icon: Icons.numbers, text: 'T$pos • #$og'),
+                              _Pill(icon: Icons.numbers, text: codigo),
                               _Pill(
                                 icon: Icons.calendar_today,
                                 text: _fmtDate(t.dataPlanejada),
