@@ -3,244 +3,184 @@ import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 
-import '../database/tarefas_trilha_dao.dart';
 import '../models/tarefa_trilha.dart';
 
 class TrilhaImporter {
-  final TarefasTrilhaDao _tarefasDao;
+  TrilhaImporter();
 
-  TrilhaImporter(this._tarefasDao);
-
-  /// Importa um CSV em bytes e grava em lote no DB.
-  Future<List<TarefaTrilha>> importarBytes(
-    Uint8List bytes, {
-    bool limparAntes = true,
-  }) async {
-    final csvText = _decodeCsvBytes(bytes);
-    return importarCsv(csvText, limparAntes: limparAntes);
+  /// Método principal (o controller usa este).
+  Future<List<TarefaTrilha>> importarBytes(Uint8List bytes) async {
+    final content = _decodeBytes(bytes);
+    return importarTexto(content);
   }
 
-  /// Importa um CSV (formato da sua planilha) e grava em lote no DB.
-  /// Regras importantes:
-  /// - Ordem global sempre vira 1..N (sequencial, sem buracos)
-  /// - Trilha = (ordemGlobal-1) ~/ 25  (TRILHA 0, 1, 2...)
-  /// - tarefa_codigo = posição dentro da trilha (1..25)
-  Future<List<TarefaTrilha>> importarCsv(
-    String csvText, {
-    bool limparAntes = true,
-  }) async {
+  /// Alias (caso você tenha chamado diferente em algum lugar).
+  Future<List<TarefaTrilha>> importarCsvBytes(Uint8List bytes) =>
+      importarBytes(bytes);
+
+  /// Também deixo esse alias por segurança.
+  Future<List<TarefaTrilha>> importarArquivoBytes(Uint8List bytes) =>
+      importarBytes(bytes);
+
+  /// Importa a partir de texto CSV.
+  Future<List<TarefaTrilha>> importarTexto(String csvText) async {
+    // Detecta delimitador: ";" (muito comum em CSV do Excel BR) ou ","
+    final delimiter = csvText.contains(';') ? ';' : ',';
+
     final rows = const CsvToListConverter(
-      eol: '\n',
       shouldParseNumbers: false,
-    ).convert(csvText);
+      fieldDelimiter: ';',
+      eol: '\n',
+    ).convert(csvText.replaceAll('\r\n', '\n'));
 
-    if (rows.isEmpty) return <TarefaTrilha>[];
+    // Se não era ';', refaz com ','
+    final parsed = (delimiter == ';')
+        ? rows
+        : const CsvToListConverter(
+            shouldParseNumbers: false,
+            fieldDelimiter: ',',
+            eol: '\n',
+          ).convert(csvText.replaceAll('\r\n', '\n'));
 
-    final header = rows.first.map((e) => e.toString().trim()).toList();
-    final idx = <String, int>{};
-    for (int i = 0; i < header.length; i++) {
-      idx[_norm(header[i])] = i;
+    if (parsed.isEmpty) return [];
+
+    // Cabeçalho
+    final header = parsed.first
+        .map((e) => (e ?? '').toString().trim())
+        .toList();
+    final col = <String, int>{};
+    for (var i = 0; i < header.length; i++) {
+      final key = _norm(header[i]);
+      if (key.isNotEmpty) col[key] = i;
     }
 
+    String cell(List row, String key) {
+      final idx = col[_norm(key)];
+      if (idx == null || idx < 0 || idx >= row.length) return '';
+      return (row[idx] ?? '').toString().trim();
+    }
+
+    // Dados
+    final dataRows = parsed.skip(1).toList();
     final tarefas = <TarefaTrilha>[];
-    int seq = 1;
 
-    for (int r = 1; r < rows.length; r++) {
-      final row = rows[r].map((e) => e?.toString() ?? '').toList();
+    int ordem = 0; // ordem global SEQUENCIAL 1..N
 
-      // Ignora linhas vazias
-      if (row.join('').trim().isEmpty) continue;
+    for (final row in dataRows) {
+      // Linhas vazias
+      final disciplinaRaw = cell(row, 'DISCIPLINA');
+      final descRaw = cell(row, 'TAREFAS');
+      final chRaw = cell(row, 'CH');
+      final dataRaw = cell(row, 'DATA');
 
-      final tarefaNum = _parseInt(_value(idx, row, 'TAREFA')) ?? seq++;
-      final data = _parseDate(_value(idx, row, 'DATA'));
-      final disciplina = _normalizarNomeDisciplina(
-        _value(idx, row, 'DISCIPLINA') ?? 'SEM DISCIPLINA',
-      );
+      if (disciplinaRaw.isEmpty &&
+          descRaw.isEmpty &&
+          chRaw.isEmpty &&
+          dataRaw.isEmpty) {
+        continue;
+      }
 
-      final descricao = _value(idx, row, 'TAREFAS') ?? '';
-      final chPlanejada = _parseMinutos(_value(idx, row, 'CH'));
-      final chEfetiva = _parseMinutos(_value(idx, row, 'CH_EFETIVA'));
+      ordem += 1; // SEMPRE sequencial
 
-      final questoes = _parseInt(_value(idx, row, 'TOT_QUEST_FEITAS'));
-      final acertos = _parseInt(_value(idx, row, 'TOT_ACERTOS'));
-      final desempenhoRaw = _parseDouble(_value(idx, row, 'DESEMPENHO'));
-      final desempenho = _normalizeDesempenho(
-        desempenhoRaw,
-        questoes: questoes,
-        acertos: acertos,
-      );
+      final disciplina = _cleanDisciplina(disciplinaRaw);
+      final descricao = descRaw.trim();
 
-      // Por enquanto: trilha e tarefaCodigo serão recalculados no “refeeder” 1..N
-      final hashLinha = '$tarefaNum|$disciplina|$descricao'.hashCode.toString();
+      final chMin = _parseMinutes(chRaw);
+      final dataPlanejada = _parseDatePt(dataRaw);
+
+      // posição dentro da trilha (1..25)
+      final posNaTrilha = ((ordem - 1) % 25) + 1;
+
+      // trilha (0..)
+      final trilhaIndex = (ordem - 1) ~/ 25;
+      final trilha = 'TRILHA $trilhaIndex';
+
+      // Guarda o valor original "TAREFA" se existir (só pra auditoria)
+      final tarefaOriginal = cell(row, 'TAREFA'); // pode vir vazio
+      final jsonExtra = <String, dynamic>{};
+      if (tarefaOriginal.isNotEmpty)
+        jsonExtra['tarefa_original'] = tarefaOriginal;
+      if (cell(row, 'CODIGO').isNotEmpty)
+        jsonExtra['codigo'] = cell(row, 'CODIGO');
 
       tarefas.add(
         TarefaTrilha(
-          trilha: null,
-          dataPlanejada: data,
-          tarefaCodigo: null,
-          ordemGlobal: tarefaNum,
-          disciplina: disciplina,
-          descricao: descricao,
-          chPlanejadaMin: chPlanejada,
-          chEfetivaMin: chEfetiva,
-          questoes: questoes,
-          acertos: acertos,
-          desempenho: desempenho,
-          hashLinha: hashLinha,
+          trilha: trilha,
+          ordemGlobal: ordem,
+          tarefaCodigo: posNaTrilha.toString(), // 1..25
+          disciplina: disciplina.isEmpty ? null : disciplina,
+          descricao: descricao.isEmpty ? null : descricao,
+          dataPlanejada: dataPlanejada,
+          chPlanejadaMin: chMin,
+          // Campos preenchidos depois pelo app
+          chEfetivaMin: null,
+          questoes: null,
+          acertos: null,
+          desempenho: null,
           concluida: false,
+          jsonExtra: jsonExtra.isEmpty ? null : json.encode(jsonExtra),
         ),
       );
     }
 
-    if (tarefas.isEmpty) return <TarefaTrilha>[];
-
-    // Ordena por ordem_global e (depois) força uma sequência 1..N.
-    // Motivo: o CSV pode vir com números faltando, duplicados ou fora de ordem.
-    tarefas.sort((a, b) => (a.ordemGlobal ?? 0).compareTo(b.ordemGlobal ?? 0));
-
-    final normalizadas = <TarefaTrilha>[];
-    for (int i = 0; i < tarefas.length; i++) {
-      final og = i + 1; // 1..N SEMPRE
-      final trilhaIndex = (og - 1) ~/ 25; // 0..n
-      final posNaTrilha = ((og - 1) % 25) + 1; // 1..25
-
-      final t = tarefas[i];
-
-      // Hash agora fica estável com a nova ordem
-      final hashLinha = '$og|${t.disciplina ?? ''}|${t.descricao ?? ''}'
-          .hashCode
-          .toString();
-
-      normalizadas.add(
-        t.copyWith(
-          ordemGlobal: og,
-          trilha: 'TRILHA $trilhaIndex',
-          tarefaCodigo: '$posNaTrilha',
-          hashLinha: hashLinha,
-        ),
-      );
-    }
-
-    // Substitui tudo: “controle completo”
-    if (limparAntes) {
-      await _tarefasDao.limparTudo();
-    }
-    await _tarefasDao.inserirEmLote(normalizadas);
-    return _tarefasDao.listarTodas();
+    return tarefas;
   }
 
-  // ---------------- Helpers ----------------
-
-  String _norm(String s) {
-    return s
-        .toLowerCase()
-        .trim()
-        .replaceAll(RegExp(r'\s+'), '_')
-        .replaceAll('ç', 'c')
-        .replaceAll('ã', 'a')
-        .replaceAll('á', 'a')
-        .replaceAll('à', 'a')
-        .replaceAll('â', 'a')
-        .replaceAll('é', 'e')
-        .replaceAll('ê', 'e')
-        .replaceAll('í', 'i')
-        .replaceAll('ó', 'o')
-        .replaceAll('ô', 'o')
-        .replaceAll('õ', 'o')
-        .replaceAll('ú', 'u');
-  }
-
-  String _decodeCsvBytes(Uint8List bytes) {
-    final semBom = _removeUtf8Bom(bytes);
+  String _decodeBytes(Uint8List bytes) {
+    // tenta UTF-8; se falhar, latin1 (excel BR é comum)
     try {
-      return utf8.decode(semBom);
-    } on FormatException {
-      return latin1.decode(semBom);
+      return utf8.decode(bytes, allowMalformed: true);
+    } catch (_) {
+      return latin1.decode(bytes, allowMalformed: true);
     }
   }
 
-  Uint8List _removeUtf8Bom(Uint8List bytes) {
-    if (bytes.length >= 3 &&
-        bytes[0] == 0xEF &&
-        bytes[1] == 0xBB &&
-        bytes[2] == 0xBF) {
-      return bytes.sublist(3);
+  String _norm(String s) => s.trim().toUpperCase();
+
+  String _cleanDisciplina(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return '';
+    // Normalização leve (você disse que RLM/Raciocínio-lógico tanto faz)
+    final up = t.toUpperCase();
+    if (up == 'RLM' || up == 'RACIOCINIO-LOGICO' || up == 'RACIOCÍNIO-LÓGICO') {
+      return 'RACIOCÍNIO LÓGICO';
     }
-    return bytes;
+    if (up == 'RACIOCINIO LOGICO') return 'RACIOCÍNIO LÓGICO';
+    return t;
   }
 
-  String? _value(Map<String, int> idx, List<String> row, String col) {
-    final key = _norm(col);
-    final i = idx[key];
-    if (i == null) return null;
-    if (i < 0 || i >= row.length) return null;
-    final v = row[i];
-    return v.trim().isEmpty ? null : v.trim();
-  }
+  DateTime? _parseDatePt(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return null;
 
-  int? _parseInt(String? v) {
-    if (v == null) return null;
-    final s = v.replaceAll(RegExp(r'[^0-9-]'), '').trim();
-    return s.isEmpty ? null : int.tryParse(s);
-  }
-
-  double? _parseDouble(String? v) {
-    if (v == null) return null;
-    final s = v.replaceAll('%', '').replaceAll(',', '.').trim();
-    return s.isEmpty ? null : double.tryParse(s);
-  }
-
-  DateTime? _parseDate(String? v) {
-    if (v == null) return null;
-    final s = v.trim();
-    if (s.isEmpty) return null;
-
-    final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{2,4})$').firstMatch(s);
+    // dd/MM/yyyy
+    final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(t);
     if (m != null) {
-      final d = int.parse(m.group(1)!);
-      final mo = int.parse(m.group(2)!);
-      var y = int.parse(m.group(3)!);
-      if (y < 100) y += 2000;
-      return DateTime(y, mo, d);
+      final dd = int.tryParse(m.group(1)!) ?? 1;
+      final mm = int.tryParse(m.group(2)!) ?? 1;
+      final yy = int.tryParse(m.group(3)!) ?? 2000;
+      return DateTime(yy, mm, dd);
     }
 
-    return DateTime.tryParse(s);
+    // fallback ISO
+    return DateTime.tryParse(t);
   }
 
-  int? _parseMinutos(String? v) {
-    if (v == null) return null;
-    final s = v.trim();
-    if (s.isEmpty) return null;
+  int? _parseMinutes(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return null;
 
-    final hm = RegExp(r'^(\d+):(\d{1,2})$').firstMatch(s);
+    // "1:00" ou "01:30"
+    final hm = RegExp(r'^(\d{1,2})\s*:\s*(\d{1,2})$').firstMatch(t);
     if (hm != null) {
-      final h = int.parse(hm.group(1)!);
-      final m = int.parse(hm.group(2)!);
-      return h * 60 + m;
+      final h = int.tryParse(hm.group(1)!) ?? 0;
+      final m = int.tryParse(hm.group(2)!) ?? 0;
+      return (h * 60) + m;
     }
 
-    return int.tryParse(s);
-  }
-
-  double? _normalizeDesempenho(double? d, {int? questoes, int? acertos}) {
-    if (d == null) {
-      if (questoes != null && questoes > 0 && acertos != null) {
-        return (acertos / questoes).clamp(0.0, 1.0);
-      }
-      return null;
-    }
-    if (d > 1.0) {
-      if (d <= 100.0) return (d / 100.0).clamp(0.0, 1.0);
-      return 1.0;
-    }
-    return d.clamp(0.0, 1.0);
-  }
-
-  String _normalizarNomeDisciplina(String s) {
-    final n = _norm(s).replaceAll('_', '');
-    if (n == 'rlm' || n.contains('raciociniologico')) {
-      return 'Raciocínio Lógico';
-    }
-    return s.trim();
+    // "60", "60min", "150 min"
+    final n = RegExp(r'(\d+)').firstMatch(t)?.group(1);
+    if (n == null) return null;
+    return int.tryParse(n);
   }
 }
