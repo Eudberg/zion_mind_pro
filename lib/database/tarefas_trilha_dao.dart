@@ -1,99 +1,104 @@
+import 'package:sqflite/sqflite.dart';
+import 'db_helper.dart'; // Certifique-se que este import está correto
 import '../models/tarefa_trilha.dart';
-import 'db_helper.dart';
 
 class TarefasTrilhaDao {
-  Future<List<int>> inserirEmLote(List<TarefaTrilha> tarefas) async {
-    final db = await DbHelper.instance.database;
+  // Nome da tabela
+  static const String _tableName = 'tarefas_trilha';
+
+  // --- AQUI ESTAVA FALTANDO: O GETTER (O ATALHO) ---
+  // Isso permite usar "await database" em qualquer lugar desta classe
+  Future<Database> get database async => await DbHelper.instance.database;
+
+  // Insere lista (Batch)
+  Future<void> inserirEmLote(List<TarefaTrilha> tarefas) async {
+    final db = await database; // Agora funciona!
     final batch = db.batch();
-    for (final tarefa in tarefas) {
-      batch.insert('tarefas_trilha', tarefa.toMap());
+
+    for (var tarefa in tarefas) {
+      batch.insert(
+        _tableName,
+        tarefa.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     }
-    final result = await batch.commit(noResult: false);
-    return result.map((e) => e as int).toList();
+
+    await batch.commit(noResult: true);
   }
 
+  // Lista todas
   Future<List<TarefaTrilha>> listarTodas() async {
-    final db = await DbHelper.instance.database;
-    final result = await db.query(
-      'tarefas_trilha',
-      orderBy: 'ordem_global ASC',
-    );
-    return result.map((json) => TarefaTrilha.fromMap(json)).toList();
+    final db = await database;
+    // Ordena por ordem global para manter a sequência da trilha
+    final result = await db.query(_tableName, orderBy: 'ordem_global ASC');
+    return result.map((map) => TarefaTrilha.fromMap(map)).toList();
   }
 
-  Future<List<TarefaTrilha>> listarPorData(DateTime data) async {
-    final db = await DbHelper.instance.database;
-    final key = _dateKey(data);
-    final result = await db.query(
-      'tarefas_trilha',
-      where: 'data_planejada LIKE ?',
-      whereArgs: ['$key%'],
-      orderBy: 'ordem_global ASC',
-    );
-    return result.map((json) => TarefaTrilha.fromMap(json)).toList();
-  }
-
-  // ✅ pendências acumuladas: data_planejada <= hoje AND concluida=0
-  Future<List<TarefaTrilha>> listarPendentesAte(DateTime data) async {
-    final db = await DbHelper.instance.database;
-    final key = _dateKey(data);
-    final result = await db.query(
-      'tarefas_trilha',
-      where:
-          "(data_planejada IS NOT NULL AND data_planejada <= ?) AND concluida = 0",
-      whereArgs: ['${key}T23:59:59.999'],
-      orderBy: 'data_planejada ASC, ordem_global ASC',
-    );
-    return result.map((json) => TarefaTrilha.fromMap(json)).toList();
-  }
-
-  Future<void> marcarConcluida(int tarefaId, bool concluida) async {
-    final db = await DbHelper.instance.database;
+  // Marca como concluída (Simples)
+  Future<void> marcarConcluida(int id, bool concluida) async {
+    final db = await database;
     await db.update(
-      'tarefas_trilha',
-      {'concluida': concluida ? 1 : 0},
+      _tableName,
+      {
+        'concluida': concluida ? 1 : 0,
+        // Se concluiu, salva agora. Se desmarcou, limpa a data.
+        'data_conclusao': concluida ? DateTime.now().toIso8601String() : null,
+      },
       where: 'id = ?',
-      whereArgs: [tarefaId],
+      whereArgs: [id],
     );
   }
 
+  // Atualiza campos (Complexo - Onde estava o erro)
   Future<void> atualizarCampos({
     required int tarefaId,
     int? questoes,
     int? acertos,
     String? fonteQuestoes,
     bool? concluida,
-    int? chEfetivaMin,
+    DateTime? dataConclusao, // Parâmetro novo
+    int? minutosExecutados, // Parâmetro novo
   }) async {
-    final db = await DbHelper.instance.database;
-    final values = <String, dynamic>{};
+    final db = await database; // <--- O ERRO SUMIRÁ AQUI
 
-    if (questoes != null) values['questoes'] = questoes;
-    if (acertos != null) values['acertos'] = acertos;
-    if (fonteQuestoes != null) values['fonte_questoes'] = fonteQuestoes;
-    if (concluida != null) values['concluida'] = concluida ? 1 : 0;
-    if (chEfetivaMin != null) values['ch_efetiva_min'] = chEfetivaMin;
+    Map<String, dynamic> campos = {};
 
-    if (values.isEmpty) return;
+    if (questoes != null) campos['questoes'] = questoes;
+    if (acertos != null) campos['acertos'] = acertos;
+    if (fonteQuestoes != null) campos['fonte_questoes'] = fonteQuestoes;
 
-    await db.update(
-      'tarefas_trilha',
-      values,
-      where: 'id = ?',
-      whereArgs: [tarefaId],
-    );
+    if (concluida != null) {
+      campos['concluida'] = concluida ? 1 : 0;
+
+      if (concluida) {
+        // Se passou data específica (edição manual), usa ela. Se não, usa Agora.
+        campos['data_conclusao'] = (dataConclusao ?? DateTime.now())
+            .toIso8601String();
+      } else {
+        campos['data_conclusao'] = null;
+      }
+    } else if (dataConclusao != null) {
+      // Edição apenas da data, mantendo o status atual
+      campos['data_conclusao'] = dataConclusao.toIso8601String();
+    }
+
+    if (minutosExecutados != null) {
+      campos['ch_efetiva_min'] = minutosExecutados;
+    }
+
+    if (campos.isNotEmpty) {
+      await db.update(
+        _tableName,
+        campos,
+        where: 'id = ?',
+        whereArgs: [tarefaId],
+      );
+    }
   }
 
+  // Limpa tudo
   Future<void> limparTudo() async {
-    final db = await DbHelper.instance.database;
-    await db.delete('tarefas_trilha');
-  }
-
-  String _dateKey(DateTime data) {
-    final d = DateTime(data.year, data.month, data.day);
-    final y = d.year.toString().padLeft(4, '0');
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '$y-$m-$day';
+    final db = await database;
+    await db.delete(_tableName);
   }
 }

@@ -33,6 +33,9 @@ class TarefaTrilha {
 
   final bool concluida;
 
+  // --- O CAMPO QUE FALTAVA ---
+  final String? dataConclusao;
+
   const TarefaTrilha({
     this.id,
     this.trilha,
@@ -53,9 +56,10 @@ class TarefaTrilha {
     this.jsonExtra,
     this.hashLinha,
     this.concluida = false,
+    this.dataConclusao, // Adicionado ao construtor
   });
 
-  // Regras especiais (descanso / limpar erros)
+  // Regras especiais
   bool get isDescanso {
     final d = (disciplina ?? '').toLowerCase();
     final x = (descricao ?? '').toLowerCase();
@@ -70,7 +74,6 @@ class TarefaTrilha {
         x.contains('limpe os erros');
   }
 
-  // desempenho calculado por acertos/questoes (se disponível), sempre 0..1
   double? get desempenhoCalculado {
     if (questoes != null && questoes! > 0 && acertos != null) {
       return (acertos! / questoes!).clamp(0.0, 1.0);
@@ -99,6 +102,7 @@ class TarefaTrilha {
     String? jsonExtra,
     String? hashLinha,
     bool? concluida,
+    String? dataConclusao, // Adicionado ao copyWith
   }) {
     return TarefaTrilha(
       id: id ?? this.id,
@@ -120,6 +124,7 @@ class TarefaTrilha {
       jsonExtra: jsonExtra ?? this.jsonExtra,
       hashLinha: hashLinha ?? this.hashLinha,
       concluida: concluida ?? this.concluida,
+      dataConclusao: dataConclusao ?? this.dataConclusao,
     );
   }
 
@@ -144,6 +149,7 @@ class TarefaTrilha {
       'json_extra': jsonExtra,
       'hash_linha': hashLinha,
       'concluida': concluida ? 1 : 0,
+      'data_conclusao': dataConclusao, // Adicionado ao Mapa do Banco
     };
   }
 
@@ -168,6 +174,7 @@ class TarefaTrilha {
       jsonExtra: map['json_extra'] as String?,
       hashLinha: map['hash_linha'] as String?,
       concluida: (map['concluida'] as int? ?? 0) == 1,
+      dataConclusao: map['data_conclusao'] as String?, // Recuperado do Banco
     );
   }
 

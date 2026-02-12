@@ -19,18 +19,15 @@ class _TelaTrilhaState extends State<TelaTrilha> {
     Future.microtask(() => context.read<TrilhaController>().carregarTarefas());
   }
 
+  // --- LÓGICA DE AGRUPAMENTO (Mantida igual) ---
   String _grupoKey(TarefaTrilha t) {
-    // Regra principal: trilha = floor((ordemGlobal-1)/25)
     final og = t.ordemGlobal;
     if (og != null && og > 0) {
-      final idx = (og - 1) ~/ 25; // 0,1,2...
+      final idx = (og - 1) ~/ 25;
       return 'TRILHA $idx';
     }
-
-    // Fallback: usa o campo "trilha" se existir
     final raw = (t.trilha ?? '').trim();
     if (raw.isEmpty) return 'SEM TRILHA';
-
     final up = raw.toUpperCase();
     final n = RegExp(r'(\d+)').firstMatch(up)?.group(1);
     if (n != null) return 'TRILHA ${int.parse(n)}';
@@ -55,11 +52,19 @@ class _TelaTrilhaState extends State<TelaTrilha> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<TrilhaController>();
-    final tarefas = controller.tarefas;
+
+    // MUDANÇA 1: Usa 'tarefasVisiveis' em vez de todas.
+    // Se quiser ver TODAS (incluindo concluídas), troque por controller.tarefas
+    // Mas você pediu para sumir as concluídas, então use controller.tarefasVisiveis.
+    // SE O GETTER AINDA NÃO EXISTIR NO CONTROLLER, USE controller.tarefas POR ENQUANTO.
+    final tarefas = controller.tarefasVisiveis;
 
     // Agrupa por trilha
     final Map<String, List<TarefaTrilha>> grupos = {};
     for (final t in tarefas) {
+      // Se quiser filtrar aqui na mão enquanto o getter não existe:
+      // if (t.concluida) continue;
+
       final k = _grupoKey(t);
       grupos.putIfAbsent(k, () => []).add(t);
     }
@@ -87,7 +92,7 @@ class _TelaTrilhaState extends State<TelaTrilha> {
         ],
       ),
       body: tarefas.isEmpty
-          ? const Center(child: Text('Importe uma trilha (CSV) para começar.'))
+          ? const Center(child: Text('Nenhuma tarefa pendente na trilha.'))
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
@@ -147,7 +152,8 @@ class _GrupoLista extends StatelessWidget {
     if (d == null) return 'Sem data';
     final dd = d.day.toString().padLeft(2, '0');
     final mm = d.month.toString().padLeft(2, '0');
-    final yy = d.year.toString();
+    final yy = d.year.toString(); // 2024
+    // Se quiser abreviar ano: yy.substring(2)
     return '$dd/$mm/$yy';
   }
 
@@ -164,24 +170,40 @@ class _GrupoLista extends StatelessWidget {
       children: tarefas.map((t) {
         final titulo = (t.disciplina ?? 'Sem disciplina').toUpperCase();
         final desc = (t.descricao ?? 'Sem descrição').trim();
-        final codigo = codigoGlobal(t);
+
+        // MUDANÇA 2: Ajuste no código visual
+        final codigo = t.ordemGlobal != null
+            ? '# ${t.ordemGlobal}'
+            : (t.tarefaCodigo ?? '-');
+
         final isSpecial = t.isDescanso || t.isLimparErros;
+
+        // MUDANÇA 3: Data inteligente (Mostra Conclusão se tiver, senão Planejada)
+        final DateTime? dataMostrada = t.dataConclusao != null
+            ? DateTime.tryParse(t.dataConclusao!)
+            : t.dataPlanejada;
+
+        final bool temDataConclusao = t.dataConclusao != null;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Card(
+            // Cor de Fundo: Se for revisão futura, pode mudar aqui
+            // color: t.isRevisao ? Colors.orange.shade50 : null,
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () async {
+                // MUDANÇA 4: Navegação com refresh garantido
                 final changed = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (_) => TarefaTrilhaDetalhe(tarefa: t),
                   ),
                 );
-                if (changed == true) {
-                  await controller.carregarTarefas();
-                }
+
+                // Se voltou da tela de detalhes (mesmo sem salvar explicitamente), recarrega
+                // para atualizar datas ou remover da lista se foi concluída
+                await controller.carregarTarefas();
               },
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -191,6 +213,7 @@ class _GrupoLista extends StatelessWidget {
                     Icon(
                       isSpecial ? Icons.bedtime : Icons.assignment_outlined,
                       size: 22,
+                      color: temDataConclusao ? Colors.green : null,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -199,7 +222,13 @@ class _GrupoLista extends StatelessWidget {
                         children: [
                           Text(
                             titulo,
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  decoration: t.concluida
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: t.concluida ? Colors.grey : null,
+                                ),
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -214,25 +243,30 @@ class _GrupoLista extends StatelessWidget {
                             runSpacing: 8,
                             children: [
                               _Pill(icon: Icons.numbers, text: codigo),
+
+                              // Pill da DATA (Verde se concluída)
                               _Pill(
                                 icon: Icons.calendar_today,
-                                text: _fmtDate(t.dataPlanejada),
+                                text: _fmtDate(dataMostrada),
+                                color: temDataConclusao
+                                    ? Colors.green.withOpacity(0.1)
+                                    : null,
+                                textColor: temDataConclusao
+                                    ? Colors.green
+                                    : null,
                               ),
+
                               _Pill(
                                 icon: Icons.timer,
                                 text: _fmtMin(t.chPlanejadaMin),
                               ),
-                              if (t.concluida)
-                                const _Pill(
-                                  icon: Icons.check_circle,
-                                  text: 'Concluída',
-                                ),
                             ],
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Checkbox para concluir rápido direto na lista
                     Checkbox(
                       value: t.concluida,
                       onChanged: (v) =>
@@ -252,19 +286,31 @@ class _GrupoLista extends StatelessWidget {
 class _Pill extends StatelessWidget {
   final IconData icon;
   final String text;
-  const _Pill({required this.icon, required this.text});
+  final Color? color; // Novo parâmetro
+  final Color? textColor; // Novo parâmetro
+
+  const _Pill({
+    required this.icon,
+    required this.text,
+    this.color,
+    this.textColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: color ?? Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(text)],
+        children: [
+          Icon(icon, size: 16, color: textColor),
+          const SizedBox(width: 6),
+          Text(text, style: TextStyle(color: textColor)),
+        ],
       ),
     );
   }

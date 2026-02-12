@@ -11,6 +11,7 @@ class DbHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
+    // MUDANÇA 1: Nome do banco mantido, mas a versão interna vai subir
     _database = await _initDB('zion_mind_pro_v3.db');
     return _database!;
   }
@@ -21,7 +22,7 @@ class DbHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5, // <--- MUDANÇA 2: Subi para versão 5
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -32,9 +33,10 @@ class DbHelper {
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // Se o app atualizar, ele tenta criar o que falta
     await _createTrilhaTables(db);
 
-    // tenta adicionar colunas novas sem quebrar
+    // Migrações antigas
     if (oldVersion < 3) {
       for (final sql in [
         "ALTER TABLE tarefas_trilha ADD COLUMN concluida INTEGER DEFAULT 0",
@@ -44,6 +46,17 @@ class DbHelper {
         try {
           await db.execute(sql);
         } catch (_) {}
+      }
+    }
+
+    // <--- MUDANÇA 3: Migração para versão 5 (Adiciona a coluna que faltava)
+    if (oldVersion < 5) {
+      try {
+        await db.execute(
+          "ALTER TABLE tarefas_trilha ADD COLUMN data_conclusao TEXT",
+        );
+      } catch (e) {
+        // Se já existir, ignora
       }
     }
   }
@@ -69,7 +82,8 @@ class DbHelper {
         rev_60d TEXT,
         json_extra TEXT,
         hash_linha TEXT,
-        concluida INTEGER DEFAULT 0
+        concluida INTEGER DEFAULT 0,
+        data_conclusao TEXT  -- <--- MUDANÇA 4: A COLUNA FINALMENTE ESTÁ AQUI NA CRIAÇÃO!
       )
     ''');
 
@@ -142,6 +156,8 @@ class DbHelper {
 
   Future<int> inserirSessao(SessaoEstudo sessao) async {
     final db = await database;
+    // Verifica qual tabela usar. Se 'sessoes' for a antiga e 'sessoes_estudo' a nova,
+    // ajuste aqui conforme seu uso. Vou manter o original.
     return db.insert('sessoes', sessao.toLegacyMap());
   }
 }

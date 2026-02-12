@@ -13,6 +13,19 @@ class TrilhaController extends ChangeNotifier {
 
   List<TarefaTrilha> _tarefas = [];
   List<TarefaTrilha> get tarefas => _tarefas;
+  // --- FILTRO INTELIGENTE (O Segredo para esconder/mostrar) ---
+  List<TarefaTrilha> get tarefasVisiveis {
+    return _tarefas.where((t) {
+      // 1. Se não está concluída, MOSTRA (é tarefa nova)
+      if (!t.concluida) return true;
+
+      // 2. Se está concluída, ESCONDE (por enquanto).
+      // Futuramente, aqui colocaremos a lógica de revisão:
+      // Ex: if (hoje >= dataRevisao) return true;
+
+      return false;
+    }).toList();
+  }
 
   bool _carregando = false;
   bool get carregando => _carregando;
@@ -127,12 +140,14 @@ class TrilhaController extends ChangeNotifier {
     await carregarTarefas();
   }
 
+// Substitua o método antigo por este novo dentro de TrilhaController
   Future<void> atualizarTarefaCampos({
     required int tarefaId,
     int? questoes,
     int? acertos,
     String? fonteQuestoes,
     bool? concluida,
+    DateTime? dataConclusao, // <--- O parâmetro que faltava
   }) async {
     await _dao.atualizarCampos(
       tarefaId: tarefaId,
@@ -140,7 +155,36 @@ class TrilhaController extends ChangeNotifier {
       acertos: acertos,
       fonteQuestoes: fonteQuestoes,
       concluida: concluida,
+      dataConclusao: dataConclusao, // <--- Repassa para o banco
     );
+
+    // Recarrega a lista para a tela atualizar
+    await carregarTarefas();
+  }  // ... dentro de TrilhaController ...
+
+  // 1. PARA EDIÇÃO MANUAL DA DATA
+  Future<void> editarDataConclusao(int tarefaId, DateTime novaData) async {
+    await _dao.atualizarCampos(
+      tarefaId: tarefaId,
+      concluida: true, // Garante que fica concluída
+      dataConclusao: novaData,
+    );
+    await carregarTarefas(); // Atualiza a tela
+  }
+
+  // 2. PARA O CRONÔMETRO CHAMAR
+  Future<void> finalizarPeloCronometro(
+    int tarefaId,
+    int minutosEstudados,
+  ) async {
+    await _dao.atualizarCampos(
+      tarefaId: tarefaId,
+      concluida: true,
+      dataConclusao: DateTime.now(), // Pega a hora exata que o timer parou
+      minutosExecutados: minutosEstudados,
+    );
+
+    // Opcional: Se quiser vibrar ou tocar som aqui
     await carregarTarefas();
   }
 
