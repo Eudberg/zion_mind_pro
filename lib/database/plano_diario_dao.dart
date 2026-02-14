@@ -2,8 +2,11 @@ import '../models/plano_item.dart';
 import 'db_helper.dart';
 
 class PlanoDiarioDao {
+  // Correção: Alterado de DbHelper.instance para DbHelper()
+
   Future<List<int>> inserirEmLote(List<PlanoItem> itens) async {
-    final db = await DbHelper.instance.database;
+    // Chamamos o singleton através do construtor factory DbHelper()
+    final db = await DbHelper().database;
     final batch = db.batch();
     for (final item in itens) {
       batch.insert('plano_diario', item.toMap());
@@ -13,7 +16,7 @@ class PlanoDiarioDao {
   }
 
   Future<List<PlanoItem>> listarPorData(DateTime data) async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     final key = _dateKey(data);
     final result = await db.query(
       'plano_diario',
@@ -25,17 +28,13 @@ class PlanoDiarioDao {
   }
 
   Future<void> limparPorData(DateTime data) async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     final key = _dateKey(data);
-    await db.delete(
-      'plano_diario',
-      where: 'data LIKE ?',
-      whereArgs: ['$key%'],
-    );
+    await db.delete('plano_diario', where: 'data LIKE ?', whereArgs: ['$key%']);
   }
 
   Future<void> limparTudo() async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     await db.delete('plano_diario');
   }
 

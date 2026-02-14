@@ -1,215 +1,242 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-
-import '../data/trilha_importer.dart';
-import '../database/tarefas_trilha_dao.dart';
 import '../models/tarefa_trilha.dart';
-import '../models/disciplina.dart';
-import '../models/plano_item.dart'; // <--- Importando o SEU modelo existente
+import '../models/sessao_estudo.dart';
+import '../database/tarefas_trilha_dao.dart';
+import '../database/sessoes_dao.dart';
+import '../data/trilha_importer.dart';
 
 class TrilhaController extends ChangeNotifier {
-  final TarefasTrilhaDao _dao = TarefasTrilhaDao();
-  final TrilhaImporter _importer = TrilhaImporter();
+  final TarefasTrilhaDAO _tarefasDAO = TarefasTrilhaDAO();
+  final SessoesDao _sessoesDAO = SessoesDao();
 
   List<TarefaTrilha> _tarefas = [];
+  bool _isLoading = false;
+
+  // CORREÇÃO: Campos marcados como final para satisfazer o linter,
+  // já que não são reatribuídos diretamente (apenas seus conteúdos mudam).
+  final DateTime _dataSelecionada = DateTime.now();
+  final List<dynamic> _planoDoDia = [];
+
+  // Getters principais
   List<TarefaTrilha> get tarefas => _tarefas;
-  // --- FILTRO INTELIGENTE (O Segredo para esconder/mostrar) ---
-  List<TarefaTrilha> get tarefasVisiveis {
+  bool get isLoading => _isLoading;
+  DateTime get dataSelecionada => _dataSelecionada;
+  List<dynamic> get planoDoDia => _planoDoDia;
+
+  // Getters para Métricas Globais
+  int get totalMinutosPlanejados =>
+      _tarefas.fold(0, (sum, t) => sum + t.chPlanejadaMin);
+  int get totalMinutosEfetivos =>
+      _tarefas.fold(0, (sum, t) => sum + (t.chEfetivaMin ?? 0));
+
+  int get diasAtivos {
+    final datasUnicas = _tarefas
+        .where((t) => t.dataConclusao != null)
+        .map(
+          (t) =>
+              "${t.dataConclusao!.year}-${t.dataConclusao!.month}-${t.dataConclusao!.day}",
+        )
+        .toSet();
+    return datasUnicas.length;
+  }
+
+  // --- LÓGICA DE MÉTRICAS POR MATÉRIA (Resolvendo erro na TelaEstatisticas) ---
+  Map<String, Map<String, double>> get metricasPorMateria {
+    Map<String, double> planejado = {};
+    Map<String, double> realizado = {};
+    Map<String, double> acertos = {};
+    Map<String, double> totalQuestoes = {};
+
+    for (var t in _tarefas) {
+      planejado[t.disciplina] =
+          (planejado[t.disciplina] ?? 0) + t.chPlanejadaMin;
+      realizado[t.disciplina] =
+          (realizado[t.disciplina] ?? 0) + (t.chEfetivaMin ?? 0);
+
+      if (t.questoes != null && t.questoes! > 0) {
+        totalQuestoes[t.disciplina] =
+            (totalQuestoes[t.disciplina] ?? 0) + t.questoes!;
+        acertos[t.disciplina] = (acertos[t.disciplina] ?? 0) + (t.acertos ?? 0);
+      }
+    }
+
+    Map<String, Map<String, double>> resultados = {};
+    planejado.forEach((disciplina, tempoTotal) {
+      double progresso = tempoTotal > 0
+          ? (realizado[disciplina] ?? 0) / tempoTotal
+          : 0;
+      double precisao = (totalQuestoes[disciplina] ?? 0) > 0
+          ? (acertos[disciplina] ?? 0) / totalQuestoes[disciplina]!
+          : 0;
+
+      resultados[disciplina] = {
+        'progresso': progresso,
+        'precisao': precisao,
+        'minutosRealizados': realizado[disciplina] ?? 0,
+        'minutosPlanejados': tempoTotal,
+      };
+    });
+    return resultados;
+  }
+
+  // Mapeamento seguro de IDs para busca em listas
+  Map<int, TarefaTrilha> get tarefasPorId => {
+    for (var t in _tarefas)
+      if (t.id != null) t.id!: t,
+  };
+
+  TrilhaController() {
+    carregarTarefas();
+  }
+
+  /// REATIVIDADE: Método central de carregamento que aciona o notifyListeners()
+  Future<void> carregarTarefas() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _tarefas = await _tarefasDAO.listarTodas();
+      _tarefas.sort((a, b) => a.ordemGlobal.compareTo(b.ordemGlobal));
+    } catch (e) {
+      debugPrint("Erro ao carregar tarefas: $e");
+    }
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// LÓGICA DE AGRUPAMENTO (PDF): (ordem - 1) ~/ 25
+  Map<int, List<TarefaTrilha>> get tarefasAgrupadasPorTrilha {
+    Map<int, List<TarefaTrilha>> grupos = {};
+    final pendentes = _tarefas.where((t) => !t.concluida).toList();
+
+    for (var t in pendentes) {
+      int trilhaNum = (t.ordemGlobal - 1) ~/ 25;
+      if (!grupos.containsKey(trilhaNum)) grupos[trilhaNum] = [];
+      grupos[trilhaNum]!.add(t);
+    }
+    return grupos;
+  }
+
+  /// REATIVIDADE: Agora chama carregarTarefas() para atualizar a UI instantaneamente
+  Future<void> registrarConclusao(
+    TarefaTrilha tarefa,
+    int minutos,
+    int questoes,
+    int acertos,
+  ) async {
+    final now = DateTime.now();
+    int novoEstagio = tarefa.estagioRevisao;
+    DateTime? novaDataRevisao;
+
+    if (tarefa.estagioRevisao == 0) {
+      novoEstagio = 1;
+      novaDataRevisao = now.add(const Duration(days: 7));
+    } else if (tarefa.estagioRevisao == 1) {
+      novoEstagio = 2;
+      novaDataRevisao = now.add(const Duration(days: 30));
+    } else if (tarefa.estagioRevisao == 2) {
+      novoEstagio = 3;
+      novaDataRevisao = now.add(const Duration(days: 60));
+    } else if (tarefa.estagioRevisao == 3) {
+      novoEstagio = 4;
+      novaDataRevisao = null;
+    }
+
+    final tarefaAtualizada = TarefaTrilha(
+      id: tarefa.id,
+      ordemGlobal: tarefa.ordemGlobal,
+      disciplina: tarefa.disciplina,
+      assunto: tarefa.assunto,
+      duracaoMinutos: tarefa.duracaoMinutos,
+      chPlanejadaMin: tarefa.chPlanejadaMin,
+      concluida: true,
+      descricao: tarefa.descricao,
+      fonteQuestoes: tarefa.fonteQuestoes,
+      questoes: questoes > 0 ? questoes : (tarefa.questoes ?? 0),
+      acertos: questoes > 0 ? acertos : (tarefa.acertos ?? 0),
+      trilha: tarefa.trilha,
+      tarefaCodigo: tarefa.tarefaCodigo,
+      chEfetivaMin: (tarefa.chEfetivaMin ?? 0) + minutos,
+      estagioRevisao: novoEstagio,
+      dataConclusao: now,
+      dataProximaRevisao: novaDataRevisao,
+    );
+
+    await _tarefasDAO.atualizar(tarefaAtualizada);
+
+    final sessao = SessaoEstudo(
+      tarefaId: tarefa.id ?? 0,
+      disciplina: tarefa.disciplina,
+      dataInicio: now,
+      duracaoMinutos: minutos,
+      questoesFeitas: questoes,
+      questoesAcertadas: acertos,
+    );
+    await _sessoesDAO.inserir(sessao);
+
+    await carregarTarefas();
+  }
+
+  Future<void> atualizarTarefaCampos(TarefaTrilha t) async {
+    await _tarefasDAO.atualizar(t);
+    await carregarTarefas();
+  }
+
+  void gerarPlanoDoDia() {
+    notifyListeners();
+  }
+
+  void editarDataConclusao(int id, DateTime data) {
+    notifyListeners();
+  }
+
+  List<TarefaTrilha> get tarefasPendentes {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     return _tarefas.where((t) {
-      // 1. Se não está concluída, MOSTRA (é tarefa nova)
-      if (!t.concluida) return true;
-
-      // 2. Se está concluída, ESCONDE (por enquanto).
-      // Futuramente, aqui colocaremos a lógica de revisão:
-      // Ex: if (hoje >= dataRevisao) return true;
-
+      if (t.estagioRevisao == 0 && !t.concluida) return true;
+      if (t.dataProximaRevisao != null) {
+        final revDate = t.dataProximaRevisao!;
+        final revDateNormalized = DateTime(
+          revDate.year,
+          revDate.month,
+          revDate.day,
+        );
+        return revDateNormalized.isBefore(today) ||
+            revDateNormalized.isAtSameMomentAs(today);
+      }
       return false;
     }).toList();
   }
 
-  bool _carregando = false;
-  bool get carregando => _carregando;
-
-  // --- VARIÁVEIS DE PLANEJAMENTO ---
-  DateTime _dataSelecionada = DateTime.now();
-
-  // Agora a lista é de 'PlanoItem' para bater com a sua tela
-  List<PlanoItem> _planoDoDia = [];
-
-  // Mapa para a tela buscar o Nome/Descrição da tarefa pelo ID
-  Map<int, TarefaTrilha> _tarefasPorId = {};
-
-  // --- GETTERS (Resolvendo os erros da Tela) ---
-  DateTime get dataSelecionada => _dataSelecionada;
-  List<PlanoItem> get planoDoDia => _planoDoDia;
-  Map<int, TarefaTrilha> get tarefasPorId => _tarefasPorId;
-
-  // Estatísticas
-  int get totalMinutosEfetivos =>
-      _tarefas.where((t) => t.concluida).length * 60;
-  int get totalMinutosPlanejados => _tarefas.length * 60;
-  int get diasAtivos => 1;
-
-  // ===========================================================================
-  // LÓGICA DE PLANEJAMENTO (O Coração do problema)
-  // ===========================================================================
-
-  // Método que a tela chama (com ou sem data)
-  void gerarPlanoDoDia([DateTime? data]) {
-    _dataSelecionada = data ?? DateTime.now();
-
-    if (_tarefas.isEmpty) {
-      _planoDoDia = [];
-      _tarefasPorId = {};
-    } else {
-      // 1. Filtra o que está pendente na trilha
-      final pendentes = _tarefas.where((t) => !t.concluida).toList();
-
-      // 2. Ordena pela ordem global da trilha
-      pendentes.sort(
-        (a, b) => (a.ordemGlobal ?? 0).compareTo(b.ordemGlobal ?? 0),
+  List<TarefaTrilha> get revisoesFuturas {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return _tarefas.where((t) {
+      if (t.dataProximaRevisao == null) return false;
+      final revDate = t.dataProximaRevisao!;
+      final revDateNormalized = DateTime(
+        revDate.year,
+        revDate.month,
+        revDate.day,
       );
-
-      // 3. Define a META DO DIA (Ex: Próximas 6 tarefas)
-      final metaDoDia = pendentes.take(6).toList();
-
-      // 4. Converte Tarefas em PlanoItems (usando o SEU modelo existente)
-      _planoDoDia = metaDoDia.map((t) {
-        return PlanoItem(
-          id: null, // Ainda não salvo no banco de planos, é em memória
-          data: _dataSelecionada,
-          tarefaId: t.id,
-          tipo: 'estudo', // Define o tipo padrão
-          minutosSugeridos: t.chPlanejadaMin ?? 60,
-          status: 'pendente', // String, conforme seu modelo
-        );
-      }).toList();
-
-      // 5. Popula o Mapa para a tela preencher os textos
-      _tarefasPorId = {for (var t in _tarefas) t.id!: t};
-    }
-
-    notifyListeners();
-  }
-
-  // ===========================================================================
-  // MÉTODOS DE MANUTENÇÃO (CARREGAR, IMPORTAR, ATUALIZAR)
-  // ===========================================================================
-
-  Future<void> carregarTarefas() async {
-    _carregando = true;
-    notifyListeners();
-
-    try {
-      _tarefas = await _dao.listarTodas();
-      // Ao carregar o banco, já gera o plano para a tela não ficar vazia
-      gerarPlanoDoDia(_dataSelecionada);
-    } finally {
-      _carregando = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> importarCsv() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['csv'],
-      withData: true,
-    );
-
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) return;
-
-    final tarefasImportadas = await _importer.importarBytes(bytes);
-
-    if (tarefasImportadas.isEmpty) return;
-
-    await _dao.limparTudo();
-    await _dao.inserirEmLote(tarefasImportadas);
-
-    await carregarTarefas();
-  }
-
-  Future<void> alternarConcluida(TarefaTrilha tarefa, bool concluida) async {
-    final id = tarefa.id;
-    if (id == null) return;
-    await _dao.marcarConcluida(id, concluida);
-    await carregarTarefas();
-  }
-
-// Substitua o método antigo por este novo dentro de TrilhaController
-  Future<void> atualizarTarefaCampos({
-    required int tarefaId,
-    int? questoes,
-    int? acertos,
-    String? fonteQuestoes,
-    bool? concluida,
-    DateTime? dataConclusao, // <--- O parâmetro que faltava
-  }) async {
-    await _dao.atualizarCampos(
-      tarefaId: tarefaId,
-      questoes: questoes,
-      acertos: acertos,
-      fonteQuestoes: fonteQuestoes,
-      concluida: concluida,
-      dataConclusao: dataConclusao, // <--- Repassa para o banco
-    );
-
-    // Recarrega a lista para a tela atualizar
-    await carregarTarefas();
-  }  // ... dentro de TrilhaController ...
-
-  // 1. PARA EDIÇÃO MANUAL DA DATA
-  Future<void> editarDataConclusao(int tarefaId, DateTime novaData) async {
-    await _dao.atualizarCampos(
-      tarefaId: tarefaId,
-      concluida: true, // Garante que fica concluída
-      dataConclusao: novaData,
-    );
-    await carregarTarefas(); // Atualiza a tela
-  }
-
-  // 2. PARA O CRONÔMETRO CHAMAR
-  Future<void> finalizarPeloCronometro(
-    int tarefaId,
-    int minutosEstudados,
-  ) async {
-    await _dao.atualizarCampos(
-      tarefaId: tarefaId,
-      concluida: true,
-      dataConclusao: DateTime.now(), // Pega a hora exata que o timer parou
-      minutosExecutados: minutosEstudados,
-    );
-
-    // Opcional: Se quiser vibrar ou tocar som aqui
-    await carregarTarefas();
-  }
-
-  // --- PARA A TELA INICIAL (DISCIPLINAS) ---
-  List<Disciplina> get disciplinasObjetos {
-    final Map<String, List<TarefaTrilha>> agrupado = {};
-
-    for (var t in _tarefas) {
-      final nome = (t.disciplina ?? 'Geral').trim();
-      if (!agrupado.containsKey(nome)) agrupado[nome] = [];
-      agrupado[nome]!.add(t);
-    }
-
-    final lista = agrupado.entries.map((entry) {
-      final total = entry.value.length;
-      final concluidas = entry.value.where((t) => t.concluida).length;
-
-      return Disciplina.fromTarefas(
-        nome: entry.key,
-        totalTarefas: total,
-        tarefasConcluidas: concluidas,
-      );
+      return revDateNormalized.isAfter(today);
     }).toList();
+  }
 
-    lista.sort((a, b) => a.nome.compareTo(b.nome));
-    return lista;
+  Future<void> importarTrilha(List<int> bytes) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final importer = TrilhaImporter();
+      final novasTarefas = await importer.importarBytes(bytes);
+      for (var tarefa in novasTarefas) {
+        await _tarefasDAO.inserir(tarefa);
+      }
+      await carregarTarefas();
+    } catch (e) {
+      debugPrint("Erro na importação: $e");
+    }
+    _isLoading = false;
+    notifyListeners();
   }
 }

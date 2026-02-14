@@ -1,65 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-
 import 'screens/tela_inicial.dart';
-import 'controllers/estudo_controller.dart';
 import 'controllers/trilha_controller.dart';
+import 'controllers/estudo_controller.dart';
 
 void main() {
   runApp(
     MultiProvider(
       providers: [
+        // Provedor do controlador antigo
         ChangeNotifierProvider(create: (_) => EstudoController()),
+
+        // Provedor central da Trilha Estratégica (Lógica)
         ChangeNotifierProvider(create: (_) => TrilhaController()),
       ],
-      child: const ZionMindPro(),
+      child: const MyApp(),
     ),
   );
 }
 
-class ZionMindPro extends StatelessWidget {
-  const ZionMindPro({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ZionMindPro',
+      title: 'Zion Mind Pro',
       debugShowCheckedModeBanner: false,
-
-      // TEMA (100% preservado)
       theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        primaryColor: const Color(0xFF6366F1),
-
+        scaffoldBackgroundColor: const Color(0xFF0F172A), // Slate 900
+        primaryColor: const Color(0xFF1E293B), // Slate 800
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF6366F1),
-          secondary: Color(0xFF2DD4BF),
-          surface: Color(0xFF1E293B),
-          error: Color(0xFFF43F5E),
+          primary: Colors.blue,
+          secondary: Colors.blueAccent,
+          surface: Color(0xFF1E293B), // Background dos cards
         ),
-
-        textTheme: GoogleFonts.poppinsTextTheme(
-          Theme.of(context).textTheme.apply(
-            bodyColor: Colors.white,
-            displayColor: Colors.white,
-          ),
-        ),
-
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6366F1),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-        ),
+        useMaterial3: true,
       ),
-
+      // Apontando corretamente para a classe de interface (UI)
       home: const TelaInicial(),
     );
   }

@@ -4,7 +4,6 @@ import '../models/tarefa_trilha.dart';
 
 class TrilhaImporter {
   Future<List<TarefaTrilha>> importarBytes(List<int> bytes) async {
-    // 1. Decodifica
     String conteudo;
     try {
       conteudo = utf8.decode(bytes);
@@ -12,7 +11,6 @@ class TrilhaImporter {
       conteudo = latin1.decode(bytes);
     }
 
-    // 2. Converte CSV
     List<List<dynamic>> linhas = const CsvToListConverter(
       fieldDelimiter: ',',
       eol: '\n',
@@ -30,14 +28,16 @@ class TrilhaImporter {
       final col3 = linha[3].toString();
 
       // Pula cabeçalhos
-      if (col0.contains('TRILHA') && col2.contains('TAREFA')) continue;
-      if (col3.contains('DISCIPLINA')) continue;
-      if (col0.contains('AUDITOR')) continue;
+      if (col0.contains('TRILHA') || col3.contains('DISCIPLINA')) continue;
 
-      // Mapeamento
       String numTarefaRaw = linha[2].toString().trim();
       String disciplina = linha[3].toString().trim();
-      String descricao = linha[7].toString().trim();
+
+      // CORREÇÃO: Mapeamento conforme o PDF
+      // Assunto (o que aparece no card) costuma estar na coluna 4
+      // Descrição completa (para o detalhe) na coluna 7
+      String assuntoCsv = linha[4].toString().trim();
+      String descricaoCsv = linha[7].toString().trim();
 
       if (disciplina.isEmpty && numTarefaRaw.isEmpty) continue;
 
@@ -48,27 +48,19 @@ class TrilhaImporter {
         contadorSequencial = ordemReal + 1;
       }
 
-      // CRIAÇÃO DO OBJETO (Usando os nomes da SUA classe)
       final tarefa = TarefaTrilha(
         id: null,
-
-        // Mapeia 'ordem' para 'ordemGlobal'
         ordemGlobal: ordemReal,
-
-        disciplina: disciplina.isEmpty ? 'Geral' : disciplina,
-
-        // Mapeia 'assunto' para 'descricao'
-        descricao: descricao,
-
-        // Zera tudo conforme seu pedido
+        disciplina: disciplina.isEmpty ? 'GERAL' : disciplina.toUpperCase(),
+        assunto: assuntoCsv.isEmpty
+            ? 'Sem Assunto'
+            : assuntoCsv, // Texto do card
+        descricao: descricaoCsv, // Texto completo ao clicar
+        duracaoMinutos: 60,
+        chPlanejadaMin: 60,
         concluida: false,
-        questoes: 0,
-        acertos: 0,
-
-        // Campos extras nulos por enquanto
-        trilha: 'Regular',
+        trilha: 'REGULAR',
         tarefaCodigo: numTarefaRaw,
-        chPlanejadaMin: 60, // Padrão 1h
         chEfetivaMin: 0,
       );
 

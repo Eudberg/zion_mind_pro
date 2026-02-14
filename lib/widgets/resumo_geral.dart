@@ -21,8 +21,9 @@ class ResumoGeral extends StatelessWidget {
           0,
           (acc, d) => acc + d.minutosEstudados,
         );
-        final totalMinutos =
-            totalMinutosTrilha > 0 ? totalMinutosTrilha : totalMinutosFallback;
+        final totalMinutos = totalMinutosTrilha > 0
+            ? totalMinutosTrilha
+            : totalMinutosFallback;
 
         final diasAtivos = trilha.diasAtivos;
 

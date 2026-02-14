@@ -5,13 +5,7 @@ class Revisao {
   final DateTime? dataPrevista;
   final String? status;
 
-  Revisao({
-    this.id,
-    this.tarefaId,
-    this.tipo,
-    this.dataPrevista,
-    this.status,
-  });
+  Revisao({this.id, this.tarefaId, this.tipo, this.dataPrevista, this.status});
 
   Map<String, dynamic> toMap() {
     return {

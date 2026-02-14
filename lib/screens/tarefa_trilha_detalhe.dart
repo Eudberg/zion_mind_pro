@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Import necessário para formatar data
 import 'package:provider/provider.dart';
-
 import '../controllers/trilha_controller.dart';
 import '../models/tarefa_trilha.dart';
 
@@ -21,7 +19,7 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
   bool _concluida = false;
   String? _fonte; // 'pdf' | 'sistema' | null
 
-  // Variável local para data de conclusão (para atualizar na tela instantaneamente)
+  // Variável local para data de conclusão
   DateTime? _dataConclusaoLocal;
 
   @override
@@ -36,10 +34,8 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
     _concluida = widget.tarefa.concluida;
     _fonte = widget.tarefa.fonteQuestoes;
 
-    // Inicializa data local se existir no banco
-    if (widget.tarefa.dataConclusao != null) {
-      _dataConclusaoLocal = DateTime.tryParse(widget.tarefa.dataConclusao!);
-    }
+    // CORREÇÃO: dataConclusao já é DateTime no novo modelo, não precisa de tryParse
+    _dataConclusaoLocal = widget.tarefa.dataConclusao;
   }
 
   @override
@@ -72,37 +68,46 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
       return;
     }
 
-    if (widget.tarefa.id == null) {
-      _toast('ID da tarefa não encontrado.');
-      return;
-    }
-
-    await context.read<TrilhaController>().atualizarTarefaCampos(
-      tarefaId: widget.tarefa.id!,
+    // CORREÇÃO: O Controller espera um objeto TarefaTrilha completo
+    final tarefaEditada = TarefaTrilha(
+      id: widget.tarefa.id,
+      ordemGlobal: widget.tarefa.ordemGlobal,
+      disciplina: widget.tarefa.disciplina,
+      assunto: widget.tarefa.assunto,
+      duracaoMinutos: widget.tarefa.duracaoMinutos,
+      chPlanejadaMin: widget.tarefa.chPlanejadaMin,
+      concluida: _concluida,
+      // Campos atualizados
       questoes: questoes,
       acertos: acertos,
       fonteQuestoes: _fonte,
-      concluida: _concluida,
-      dataConclusao: _dataConclusaoLocal, // Salva a data que o usuário escolheu
+      dataConclusao: _dataConclusaoLocal,
+      // Mantendo o restante original
+      descricao: widget.tarefa.descricao,
+      trilha: widget.tarefa.trilha,
+      tarefaCodigo: widget.tarefa.tarefaCodigo,
+      chEfetivaMin: widget.tarefa.chEfetivaMin,
+      estagioRevisao: widget.tarefa.estagioRevisao,
+      dataProximaRevisao: widget.tarefa.dataProximaRevisao,
     );
+
+    await context.read<TrilhaController>().atualizarTarefaCampos(tarefaEditada);
 
     if (mounted) Navigator.pop(context, true);
   }
 
-  // Função para abrir o calendário
   Future<void> _selecionarData() async {
     final novaData = await showDatePicker(
       context: context,
       initialDate: _dataConclusaoLocal ?? DateTime.now(),
       firstDate: DateTime(2024),
       lastDate: DateTime(2030),
-      // locale: const Locale('pt', 'BR'), // Se configurado
     );
 
     if (novaData != null) {
       setState(() {
         _dataConclusaoLocal = novaData;
-        _concluida = true; // Se escolheu data, marca como feito automaticamente
+        _concluida = true;
       });
     }
   }
@@ -118,7 +123,7 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.disciplina ?? 'Tarefa'),
+        title: Text(t.disciplina),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -132,7 +137,6 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Passamos a função de selecionar data para o Header
             _Header(
               tarefa: t,
               dataConclusao: _dataConclusaoLocal,
@@ -208,7 +212,7 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
               ),
             ),
             const SizedBox(height: 16),
-            if (desempenho != null)
+            if (desempenho > 0)
               Row(
                 children: [
                   Expanded(child: LinearProgressIndicator(value: desempenho)),
@@ -234,8 +238,8 @@ class _TarefaTrilhaDetalheState extends State<TarefaTrilhaDetalhe> {
 
 class _Header extends StatelessWidget {
   final TarefaTrilha tarefa;
-  final DateTime? dataConclusao; // Recebe a data atualizada da tela
-  final VoidCallback onTapData; // Recebe a função de abrir calendário
+  final DateTime? dataConclusao;
+  final VoidCallback onTapData;
 
   const _Header({
     required this.tarefa,
@@ -244,10 +248,9 @@ class _Header extends StatelessWidget {
   });
 
   String _fmtDate(DateTime? d) {
-    if (d == null) return '—'; // Retorna traço se não tiver data
+    if (d == null) return '—';
     final dd = d.day.toString().padLeft(2, '0');
     final mm = d.month.toString().padLeft(2, '0');
-    // final yy = d.year.toString(); // Ano opcional
     return '$dd/$mm';
   }
 
@@ -275,7 +278,7 @@ class _Header extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              tarefa.disciplina ?? '—',
+              tarefa.disciplina,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
@@ -284,17 +287,10 @@ class _Header extends StatelessWidget {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // 1. Chip do NÚMERO (Corrigido: Sem # #)
                 Chip(
                   avatar: const Icon(Icons.tag, size: 18),
-                  label: Text(
-                    tarefa.ordemGlobal != null
-                        ? '${tarefa.ordemGlobal}' // Só o número
-                        : (tarefa.tarefaCodigo ?? '—'),
-                  ),
+                  label: Text('${tarefa.ordemGlobal}'),
                 ),
-
-                // 2. Chip da DATA (Agora clicável e mostra data de conclusão se houver)
                 ActionChip(
                   avatar: Icon(
                     Icons.calendar_today,
@@ -303,8 +299,8 @@ class _Header extends StatelessWidget {
                   ),
                   label: Text(
                     dataConclusao != null
-                        ? _fmtDate(dataConclusao) // Mostra 12/02
-                        : 'Sem data', // Mostra "Sem data" em vez de "-"
+                        ? _fmtDate(dataConclusao)
+                        : 'Sem data',
                     style: TextStyle(
                       color: dataConclusao != null ? Colors.green : null,
                       fontWeight: dataConclusao != null
@@ -312,16 +308,12 @@ class _Header extends StatelessWidget {
                           : null,
                     ),
                   ),
-                  onPressed: onTapData, // Abre o calendário
+                  onPressed: onTapData,
                 ),
-
-                // 3. Chip do TEMPO Planejado
                 Chip(
                   avatar: const Icon(Icons.timelapse, size: 18),
                   label: Text(_fmtMin(tarefa.chPlanejadaMin)),
                 ),
-
-                // 4. Chip do TEMPO Efetivo
                 Chip(
                   avatar: const Icon(Icons.timer, size: 18),
                   label: Text(_fmtMin(tarefa.chEfetivaMin)),

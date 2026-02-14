@@ -2,8 +2,10 @@ import '../models/revisao.dart';
 import 'db_helper.dart';
 
 class RevisoesDao {
+  // Correção: Substituído DbHelper.instance por DbHelper() para alinhar com o padrão factory
+
   Future<void> inserirEmLote(List<Revisao> revisoes) async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     final batch = db.batch();
     for (final r in revisoes) {
       batch.insert('revisoes', r.toMap());
@@ -12,7 +14,7 @@ class RevisoesDao {
   }
 
   Future<List<Revisao>> listarPorData(DateTime data) async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     final key = _dateKey(data);
 
     final result = await db.query(
@@ -26,12 +28,12 @@ class RevisoesDao {
   }
 
   Future<void> limparPorTarefa(int tarefaId) async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     await db.delete('revisoes', where: 'tarefa_id = ?', whereArgs: [tarefaId]);
   }
 
   Future<void> limparTudo() async {
-    final db = await DbHelper.instance.database;
+    final db = await DbHelper().database;
     await db.delete('revisoes');
   }
 

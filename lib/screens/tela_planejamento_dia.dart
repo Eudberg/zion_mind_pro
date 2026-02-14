@@ -19,10 +19,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      // Carrega o plano (sem data = hoje)
+      if (!mounted) return;
       context.read<TrilhaController>().gerarPlanoDoDia();
     });
   }
@@ -35,7 +32,6 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
         backgroundColor: const Color(0xFF0F172A),
         title: const Text('Planejamento do Dia'),
         actions: [
-          // Botãozinho extra para forçar atualização se precisar
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => context.read<TrilhaController>().gerarPlanoDoDia(),
@@ -68,7 +64,6 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                       ).textTheme.titleLarge?.copyWith(color: Colors.white),
                     ),
                     const Spacer(),
-                    // Mostra total de tarefas
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -89,8 +84,6 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // --- LISTA DE TAREFAS ---
                 Expanded(
                   child: ListView(
                     children: [
@@ -105,9 +98,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                         ),
                       if (tarefasDia.isNotEmpty)
                         ...tarefasDia.map((item) => _PlanoCard(item: item)),
-
                       const SizedBox(height: 20),
-
                       _SectionTitle(
                         title: 'Revisões do dia',
                         count: revisoes.length,
@@ -117,8 +108,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                         const _EmptyCard(text: 'Nenhuma revisão prevista.'),
                       if (revisoes.isNotEmpty)
                         ...revisoes.map((item) => _PlanoCard(item: item)),
-
-                      const SizedBox(height: 40), // Espaço final
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -134,7 +124,6 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
 class _SectionTitle extends StatelessWidget {
   final String title;
   final int count;
-
   const _SectionTitle({required this.title, required this.count});
 
   @override
@@ -164,18 +153,13 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-// --- AQUI ESTÁ A CLASSE QUE VOCÊ PROCURAVA (AGORA TURBINADA) ---
 class _PlanoCard extends StatelessWidget {
   final PlanoItem item;
-
   const _PlanoCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    // Usamos watch para o card reagir quando a tarefa mudar (ex: ficar verde)
     final controller = context.watch<TrilhaController>();
-
-    // Busca a tarefa real no mapa do controller
     final tarefa = item.tarefaId != null
         ? controller.tarefasPorId[item.tarefaId!]
         : null;
@@ -184,17 +168,15 @@ class _PlanoCard extends StatelessWidget {
     final descricao = tarefa?.descricao ?? 'Sem descrição';
     final minutos = item.minutosSugeridos?.toString() ?? '--';
     final tipo = item.tipo ?? 'estudo';
-
-    // Dados de conclusão
-    final dataConclusao = tarefa?.dataConclusao;
     final estaConcluido = tarefa?.concluida ?? false;
+    final dataConclusao = tarefa?.dataConclusao; // Já é DateTime?
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: estaConcluido
-            ? const Color(0xFF0F172A).withOpacity(0.8) // Mais escuro se feito
+            ? const Color(0xFF0F172A).withOpacity(0.8)
             : Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
@@ -206,15 +188,12 @@ class _PlanoCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Ícone
           Icon(
             tipo == 'estudo' ? Icons.book : Icons.history,
             size: 20,
             color: estaConcluido ? Colors.green : Colors.white70,
           ),
           const SizedBox(width: 12),
-
-          // Textos
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,31 +230,23 @@ class _PlanoCard extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // --- O BOTÃO MÁGICO DE DATA/CONCLUIR ---
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () async {
-                  // Prepara data inicial
-                  final dataAtual = dataConclusao != null
-                      ? DateTime.parse(dataConclusao)
-                      : DateTime.now();
+                  // CORREÇÃO: dataConclusao já é DateTime, não precisa de parse
+                  final dataAtual = dataConclusao ?? DateTime.now();
 
-                  // Abre Calendário
                   final novaData = await showDatePicker(
                     context: context,
                     initialDate: dataAtual,
                     firstDate: DateTime(2024),
                     lastDate: DateTime(2030),
-                    // locale: const Locale('pt', 'BR'), // Descomente se tiver configurado
                   );
 
-                  // Salva se escolheu
                   if (novaData != null && tarefa?.id != null) {
                     controller.editarDataConclusao(tarefa!.id!, novaData);
                   }
@@ -304,9 +275,9 @@ class _PlanoCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         estaConcluido
-                            ? DateFormat(
-                                'dd/MM',
-                              ).format(DateTime.parse(dataConclusao!))
+                            ? DateFormat('dd/MM').format(
+                                dataConclusao!,
+                              ) // CORREÇÃO: format direto no DateTime
                             : 'Concluir',
                         style: const TextStyle(
                           fontSize: 12,
@@ -337,7 +308,6 @@ class _PlanoCard extends StatelessWidget {
 
 class _EmptyCard extends StatelessWidget {
   final String text;
-
   const _EmptyCard({required this.text});
 
   @override

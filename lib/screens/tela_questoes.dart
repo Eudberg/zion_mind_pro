@@ -144,7 +144,6 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
                 textAlign: TextAlign.center,
               ),
             );
-
           }
           return ListView.builder(
             padding: EdgeInsets.all(12),

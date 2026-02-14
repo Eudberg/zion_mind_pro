@@ -1,163 +1,117 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
-import '../models/sessao_estudo.dart';
-
 class DbHelper {
-  static final DbHelper instance = DbHelper._init();
+  // Corrigido de DBHelper para DbHelper
+  static final DbHelper _instance = DbHelper._internal();
   static Database? _database;
 
-  DbHelper._init();
+  DbHelper._internal();
+
+  factory DbHelper() => _instance;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    // MUDANÇA 1: Nome do banco mantido, mas a versão interna vai subir
-    _database = await _initDB('zion_mind_pro_v3.db');
+    _database = await _initDatabase();
     return _database!;
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
-
+  Future<Database> _initDatabase() async {
+    String path = join(await getDatabasesPath(), 'zion_mind_pro.db');
     return await openDatabase(
       path,
-      version: 5, // <--- MUDANÇA 2: Subi para versão 5
-      onCreate: _createDB,
-      onUpgrade: _upgradeDB,
+      version: 2,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
-  Future _createDB(Database db, int version) async {
-    await _createTrilhaTables(db);
-  }
-
-  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    // Se o app atualizar, ele tenta criar o que falta
-    await _createTrilhaTables(db);
-
-    // Migrações antigas
-    if (oldVersion < 3) {
-      for (final sql in [
-        "ALTER TABLE tarefas_trilha ADD COLUMN concluida INTEGER DEFAULT 0",
-        "ALTER TABLE tarefas_trilha ADD COLUMN ordem_global INTEGER",
-        "ALTER TABLE tarefas_trilha ADD COLUMN fonte_questoes TEXT",
-      ]) {
-        try {
-          await db.execute(sql);
-        } catch (_) {}
-      }
-    }
-
-    // <--- MUDANÇA 3: Migração para versão 5 (Adiciona a coluna que faltava)
-    if (oldVersion < 5) {
-      try {
-        await db.execute(
-          "ALTER TABLE tarefas_trilha ADD COLUMN data_conclusao TEXT",
-        );
-      } catch (e) {
-        // Se já existir, ignora
-      }
-    }
-  }
-
-  Future _createTrilhaTables(Database db) async {
+  Future<void> _onCreate(Database db, int version) async {
+    // Tabela completa com campos legados + novos
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS tarefas_trilha (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trilha TEXT,
-        data_planejada TEXT,
-        tarefa_codigo TEXT,
-        ordem_global INTEGER,
+      CREATE TABLE tarefas_trilha(
+        id INTEGER PRIMARY KEY,
+        ordemGlobal INTEGER,
         disciplina TEXT,
+        assunto TEXT,
+        duracaoMinutos INTEGER,
+        chPlanejadaMin INTEGER,
+        concluida INTEGER,
+        
+        -- Campos Legados restaurados
         descricao TEXT,
-        ch_planejada_min INTEGER,
-        ch_efetiva_min INTEGER,
+        fonteQuestoes TEXT,
         questoes INTEGER,
         acertos INTEGER,
-        fonte_questoes TEXT,
-        desempenho REAL,
-        rev_7d TEXT,
-        rev_30d TEXT,
-        rev_60d TEXT,
-        json_extra TEXT,
-        hash_linha TEXT,
-        concluida INTEGER DEFAULT 0,
-        data_conclusao TEXT  -- <--- MUDANÇA 4: A COLUNA FINALMENTE ESTÁ AQUI NA CRIAÇÃO!
+        trilha TEXT,
+        tarefaCodigo TEXT,
+        chEfetivaMin INTEGER,
+
+        -- Novos Campos (7-30-60)
+        estagioRevisao INTEGER DEFAULT 0,
+        dataConclusao TEXT,
+        dataProximaRevisao TEXT
       )
     ''');
 
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS plano_diario (
+      CREATE TABLE sessoes_estudo(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data TEXT,
-        tarefa_id INTEGER,
-        tipo TEXT,
-        minutos_sugeridos INTEGER,
-        status TEXT
+        tarefaId INTEGER,
+        disciplina TEXT,
+        dataInicio TEXT,
+        duracaoMinutos INTEGER,
+        questoesFeitas INTEGER,
+        questoesAcertadas INTEGER
       )
     ''');
 
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS revisoes (
+      CREATE TABLE questoes(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tarefa_id INTEGER,
-        tipo TEXT,
-        data_prevista TEXT,
-        status TEXT
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS questoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        materia TEXT,
+        disciplina TEXT,
         assunto TEXT,
-        data TEXT,
-        qtd_feitas INTEGER,
-        qtd_acertos INTEGER
+        quantidade INTEGER,
+        acertos INTEGER,
+        data TEXT
       )
     ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS sessoes_estudo (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tarefa_id INTEGER,
-        inicio TEXT,
-        fim TEXT,
-        minutos INTEGER,
-        questoes INTEGER,
-        acertos INTEGER
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS sessoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        materia TEXT,
-        data TEXT,
-        minutos INTEGER
-      )
-    ''');
-
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_tarefas_trilha_data ON tarefas_trilha(data_planejada)',
-    );
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_tarefas_trilha_ordem ON tarefas_trilha(ordem_global)',
-    );
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_plano_diario_data ON plano_diario(data)',
-    );
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_revisoes_data ON revisoes(data_prevista)',
-    );
   }
 
-  Future<int> inserirSessao(SessaoEstudo sessao) async {
-    final db = await database;
-    // Verifica qual tabela usar. Se 'sessoes' for a antiga e 'sessoes_estudo' a nova,
-    // ajuste aqui conforme seu uso. Vou manter o original.
-    return db.insert('sessoes', sessao.toLegacyMap());
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      try {
+        await db.execute(
+          'ALTER TABLE tarefas_trilha ADD COLUMN estagioRevisao INTEGER DEFAULT 0',
+        );
+        await db.execute(
+          'ALTER TABLE tarefas_trilha ADD COLUMN dataConclusao TEXT',
+        );
+        await db.execute(
+          'ALTER TABLE tarefas_trilha ADD COLUMN dataProximaRevisao TEXT',
+        );
+        // Garantindo colunas legados caso não existam
+        await db.execute(
+          'ALTER TABLE tarefas_trilha ADD COLUMN descricao TEXT',
+        );
+        await db.execute(
+          'ALTER TABLE tarefas_trilha ADD COLUMN fonteQuestoes TEXT',
+        );
+      } catch (e) {
+        print("Erro de migração (colunas já devem existir): $e");
+      }
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sessoes_estudo(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tarefaId INTEGER,
+          disciplina TEXT,
+          dataInicio TEXT,
+          duracaoMinutos INTEGER,
+          questoesFeitas INTEGER,
+          questoesAcertadas INTEGER
+        )
+      ''');
+    }
   }
 }

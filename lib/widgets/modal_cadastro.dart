@@ -1,73 +1,68 @@
 import 'package:flutter/material.dart';
 import '../models/sessao_estudo.dart';
-import '../database/db_helper.dart';
+import '../database/sessoes_dao.dart';
 
-class ModalCadastro extends StatefulWidget {
-  final VoidCallback onSave;
-  const ModalCadastro({super.key, required this.onSave});
+class ModalCadastroSessao extends StatefulWidget {
+  final int tarefaId;
+  final String disciplina;
+
+  const ModalCadastroSessao({
+    super.key,
+    required this.tarefaId,
+    required this.disciplina,
+  });
 
   @override
-  State<ModalCadastro> createState() => _ModalCadastroState();
+  State<ModalCadastroSessao> createState() => _ModalCadastroSessaoState();
 }
 
-class _ModalCadastroState extends State<ModalCadastro> {
-  final _materiaController = TextEditingController();
-  final _minutosController = TextEditingController();
+class _ModalCadastroSessaoState extends State<ModalCadastroSessao> {
+  final _timeController = TextEditingController();
+  final _qTotalController = TextEditingController();
+  final _qCorrectController = TextEditingController();
 
-  void _confirmar() async {
-    final materia = _materiaController.text;
-    final minutos = int.tryParse(_minutosController.text) ?? 0;
-
-    if (materia.isEmpty || minutos <= 0) {
-      return;
-    }
-
-    final novaSessao = SessaoEstudo(
-      materia: materia,
-      data: DateTime.now(),
-      minutos: minutos,
+  void _salvar() async {
+    final sessao = SessaoEstudo(
+      tarefaId: widget.tarefaId,
+      disciplina: widget.disciplina,
+      dataInicio: DateTime.now(),
+      duracaoMinutos: int.tryParse(_timeController.text) ?? 0,
+      questoesFeitas: int.tryParse(_qTotalController.text) ?? 0,
+      questoesAcertadas: int.tryParse(_qCorrectController.text) ?? 0,
     );
 
-    await DbHelper.instance.inserirSessao(novaSessao);
-
-    if (!mounted) {
-      return;
-    }
-
-    widget.onSave(); // Avisa a tela inicial para atualizar a lista
-    Navigator.of(context).pop(); // Fecha o modal
+    await SessoesDao().inserir(sessao);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(20),
-      child: Column(
+    return AlertDialog(
+      title: const Text("Registrar Sessão"),
+      content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
-            controller: _materiaController,
-            decoration: InputDecoration(
-              labelText: 'Matéria (Ex: Direito Tributário)',
-            ),
+            controller: _timeController,
+            decoration: const InputDecoration(labelText: "Minutos"),
           ),
           TextField(
-            controller: _minutosController,
-            decoration: InputDecoration(labelText: 'Minutos Estudados'),
-            keyboardType: TextInputType.number,
+            controller: _qTotalController,
+            decoration: const InputDecoration(labelText: "Questões"),
           ),
-          SizedBox(height: 20),
-          // ignore: sort_child_properties_last
-          ElevatedButton(
-            onPressed: _confirmar,
-            child: Text('Salvar Sessão'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo,
-              foregroundColor: Colors.white,
-            ),
+          TextField(
+            controller: _qCorrectController,
+            decoration: const InputDecoration(labelText: "Acertos"),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancelar"),
+        ),
+        ElevatedButton(onPressed: _salvar, child: const Text("Salvar")),
+      ],
     );
   }
 }

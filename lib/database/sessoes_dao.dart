@@ -1,29 +1,21 @@
+import 'package:sqflite/sqflite.dart';
 import '../models/sessao_estudo.dart';
 import 'db_helper.dart';
 
 class SessoesDao {
-  Future<int> inserir(SessaoEstudo sessao) async {
-    final db = await DbHelper.instance.database;
-    return db.insert('sessoes_estudo', sessao.toMap());
-  }
+  // Correção: Alterado de DBHelper para DbHelper para coincidir com a classe definida no db_helper.dart
+  final DbHelper _dbHelper = DbHelper();
 
-  Future<List<SessaoEstudo>> listarPorTarefa(int tarefaId) async {
-    final db = await DbHelper.instance.database;
-    final result = await db.query(
-      'sessoes_estudo',
-      where: 'tarefa_id = ?',
-      whereArgs: [tarefaId],
-      orderBy: 'inicio DESC',
-    );
-    return result.map((json) => SessaoEstudo.fromMap(json)).toList();
+  Future<int> inserir(SessaoEstudo sessao) async {
+    Database db = await _dbHelper.database;
+    return await db.insert('sessoes_estudo', sessao.toMap());
   }
 
   Future<List<SessaoEstudo>> listarTodas() async {
-    final db = await DbHelper.instance.database;
-    final result = await db.query(
-      'sessoes_estudo',
-      orderBy: 'inicio DESC',
-    );
-    return result.map((json) => SessaoEstudo.fromMap(json)).toList();
+    Database db = await _dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query('sessoes_estudo');
+    return List.generate(maps.length, (i) {
+      return SessaoEstudo.fromMap(maps[i]);
+    });
   }
 }
