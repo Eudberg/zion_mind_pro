@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/estudo_controller.dart';
+import '../controllers/trilha_controller.dart';
 
 class TelaCronometro extends StatelessWidget {
   const TelaCronometro({super.key});
@@ -37,9 +38,22 @@ class TelaCronometro extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      controller.finalizarSessao();
-                      Navigator.pop(context); // volta pro detalhe
+                     onPressed: () async {
+                      final tarefaId = controller.tarefaAtivaId;
+                      final minutos = controller.finalizarSessaoEmMinutos();
+
+                      if (tarefaId != null && minutos > 0) {
+                        await context
+                            .read<TrilhaController>()
+                            .registrarTempoCronometro(
+                              tarefaId: tarefaId,
+                              minutos: minutos,
+                            );
+                      }
+
+                      if (context.mounted) {
+                        Navigator.pop(context); // volta pro detalhe
+                      }
                     },
                     icon: const Icon(Icons.stop),
                     label: const Text('Finalizar e salvar'),

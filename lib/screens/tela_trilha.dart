@@ -165,10 +165,26 @@ class _TarefaCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              if ((tarefa.descricao ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  tarefa.descricao!.trim(),
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12,
+                    height: 1.25,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [
-                  _buildTag("1:00", Colors.white12),
+                  _buildTag(
+                    _formatDuracao(tarefa.chPlanejadaMin),
+                    Colors.white12,
+                  ),
                   const SizedBox(width: 8),
                   _buildTag(
                     "NOVA",
@@ -182,6 +198,13 @@ class _TarefaCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDuracao(int minutos) {
+    final h = minutos ~/ 60;
+    final m = minutos % 60;
+    if (h == 0) return '${m}m';
+    return '${h}h${m.toString().padLeft(2, '0')}';
   }
 
   // Widget auxiliar para as etiquetas decorativas do card

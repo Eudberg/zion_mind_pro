@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/trilha_controller.dart';
+import '../controllers/estudo_controller.dart';
+import '../models/disciplina.dart';
 import '../models/tarefa_trilha.dart';
+import 'tela_cronometro.dart';
 
 class TarefaTrilhaDetalhe extends StatefulWidget {
   final TarefaTrilha tarefa;
@@ -262,8 +265,17 @@ class _Header extends StatelessWidget {
     return '${h}h${m.toString().padLeft(2, '0')}';
   }
 
+  String _fmtSegundos(int segundos) {
+    final m = segundos ~/ 60;
+    final s = segundos % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
   @override
   Widget build(BuildContext context) {
+    final estudoController = context.watch<EstudoController>();
+    final cronometroDaTarefa =
+        estudoController.tarefaAtivaId != null &&
+        estudoController.tarefaAtivaId == tarefa.id;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -316,8 +328,40 @@ class _Header extends StatelessWidget {
                 ),
                 Chip(
                   avatar: const Icon(Icons.timer, size: 18),
-                  label: Text(_fmtMin(tarefa.chEfetivaMin)),
+                  label: Text(
+                    cronometroDaTarefa
+                        ? _fmtSegundos(estudoController.segundosSessao)
+                        : _fmtMin(tarefa.chEfetivaMin),
+                  ),
                 ),
+                ActionChip(
+                  avatar: Icon(
+                    estudoController.estudando && cronometroDaTarefa
+                        ? Icons.pause_circle_filled
+                        : Icons.play_circle_fill,
+                    size: 18,
+                    color: Colors.blueAccent,
+                  ),
+                  label: Text(
+                    estudoController.estudando && cronometroDaTarefa
+                        ? 'Cronômetro ativo'
+                        : 'Iniciar cronômetro',
+                  ),
+                  onPressed: () {
+                    if (!cronometroDaTarefa) {
+                      estudoController.iniciarSessao(
+                        Disciplina(
+                          nome: tarefa.disciplina,
+                          minutosEstudados: tarefa.chEfetivaMin ?? 0,
+                        ),
+                      );
+                    }
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TelaCronometro()),
+                    );
+                  },                ),
               ],
             ),
           ],

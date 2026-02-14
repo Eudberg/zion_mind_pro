@@ -176,8 +176,102 @@ class TrilhaController extends ChangeNotifier {
     await carregarTarefas();
   }
 
-  Future<void> atualizarTarefaCampos(TarefaTrilha t) async {
-    await _tarefasDAO.atualizar(t);
+Future<void> registrarTempoCronometro({
+    required int tarefaId,
+    required int minutos,
+  }) async {
+    if (minutos <= 0) return;
+
+    final tarefa = await _tarefasDAO.buscarPorId(tarefaId);
+    if (tarefa == null) return;
+
+    final tarefaAtualizada = TarefaTrilha(
+      id: tarefa.id,
+      ordemGlobal: tarefa.ordemGlobal,
+      disciplina: tarefa.disciplina,
+      assunto: tarefa.assunto,
+      duracaoMinutos: tarefa.duracaoMinutos,
+      chPlanejadaMin: tarefa.chPlanejadaMin,
+      concluida: tarefa.concluida,
+      descricao: tarefa.descricao,
+      fonteQuestoes: tarefa.fonteQuestoes,
+      questoes: tarefa.questoes,
+      acertos: tarefa.acertos,
+      trilha: tarefa.trilha,
+      tarefaCodigo: tarefa.tarefaCodigo,
+      chEfetivaMin: (tarefa.chEfetivaMin ?? 0) + minutos,
+      estagioRevisao: tarefa.estagioRevisao,
+      dataConclusao: tarefa.dataConclusao,
+      dataProximaRevisao: tarefa.dataProximaRevisao,
+    );
+
+    await _tarefasDAO.atualizar(tarefaAtualizada);
+
+    final sessao = SessaoEstudo(
+      tarefaId: tarefaId,
+      disciplina: tarefa.disciplina,
+      dataInicio: DateTime.now(),
+      duracaoMinutos: minutos,
+      questoesFeitas: 0,
+      questoesAcertadas: 0,
+    );
+    await _sessoesDAO.inserir(sessao);
+
+    await carregarTarefas();
+  }
+Future<void> atualizarTarefaCampos(TarefaTrilha t) async {
+    TarefaTrilha tarefaParaSalvar = t;
+
+    // Busca estado anterior para detectar transição "não concluída -> concluída"
+    final anterior = (t.id != null)
+        ? await _tarefasDAO.buscarPorId(t.id!)
+        : null;
+    final concluiuAgora =
+        (anterior?.concluida ?? false) == false && t.concluida;
+
+    if (concluiuAgora) {
+      final now = t.dataConclusao ?? DateTime.now();
+      final estagioAtual = anterior?.estagioRevisao ?? t.estagioRevisao;
+
+      int novoEstagio = estagioAtual;
+      DateTime? novaDataRevisao;
+
+      if (estagioAtual <= 0) {
+        novoEstagio = 1;
+        novaDataRevisao = now.add(const Duration(days: 7));
+      } else if (estagioAtual == 1) {
+        novoEstagio = 2;
+        novaDataRevisao = now.add(const Duration(days: 30));
+      } else if (estagioAtual == 2) {
+        novoEstagio = 3;
+        novaDataRevisao = now.add(const Duration(days: 60));
+      } else if (estagioAtual == 3) {
+        novoEstagio = 4;
+        novaDataRevisao = null;
+      }
+
+      tarefaParaSalvar = TarefaTrilha(
+        id: t.id,
+        ordemGlobal: t.ordemGlobal,
+        disciplina: t.disciplina,
+        assunto: t.assunto,
+        duracaoMinutos: t.duracaoMinutos,
+        chPlanejadaMin: t.chPlanejadaMin,
+        concluida: t.concluida,
+        descricao: t.descricao,
+        fonteQuestoes: t.fonteQuestoes,
+        questoes: t.questoes,
+        acertos: t.acertos,
+        trilha: t.trilha,
+        tarefaCodigo: t.tarefaCodigo,
+        chEfetivaMin: t.chEfetivaMin,
+        estagioRevisao: novoEstagio,
+        dataConclusao: now,
+        dataProximaRevisao: novaDataRevisao,
+      );
+    }
+
+    await _tarefasDAO.atualizar(tarefaParaSalvar);
     await carregarTarefas();
   }
 
@@ -223,19 +317,34 @@ class TrilhaController extends ChangeNotifier {
     }).toList();
   }
 
-  Future<void> importarTrilha(List<int> bytes) async {
+Future<void> importarTrilha(List<int> bytes) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       final importer = TrilhaImporter();
       final novasTarefas = await importer.importarBytes(bytes);
-      for (var tarefa in novasTarefas) {
-        await _tarefasDAO.inserir(tarefa);
+
+      // Carrega existentes para deduplicar por chave lógica
+      final existentes = await _tarefasDAO.listarTodas();
+      final chavesExistentes = existentes
+          .map((t) => '${t.ordemGlobal}|${t.disciplina}|${t.assunto}')
+          .toSet();
+
+      for (final tarefa in novasTarefas) {
+        final chave =
+            '${tarefa.ordemGlobal}|${tarefa.disciplina}|${tarefa.assunto}';
+        if (!chavesExistentes.contains(chave)) {
+          await _tarefasDAO.inserir(tarefa);
+          chavesExistentes.add(chave);
+        }
       }
+
       await carregarTarefas();
     } catch (e) {
       debugPrint("Erro na importação: $e");
     }
+
     _isLoading = false;
     notifyListeners();
   }
