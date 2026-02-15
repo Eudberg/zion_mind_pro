@@ -43,7 +43,8 @@ class TarefasTrilhaDAO {
     return await db.update(
       'tarefas_trilha',
       dados,
-      where: 'ordemGlobal = ? AND disciplina = ? AND assunto = ?',
+      where:
+          'ordemGlobal = ? AND TRIM(UPPER(disciplina)) = TRIM(UPPER(?)) AND TRIM(assunto) = TRIM(?)',
       whereArgs: [tarefa.ordemGlobal, tarefa.disciplina, tarefa.assunto],
     );
   }
@@ -71,8 +72,25 @@ class TarefasTrilhaDAO {
     Database db = await _dbHelper.database;
     final maps = await db.query(
       'tarefas_trilha',
-      where: 'ordemGlobal = ? AND disciplina = ? AND assunto = ?',
+      where:
+          'ordemGlobal = ? AND TRIM(UPPER(disciplina)) = TRIM(UPPER(?)) AND TRIM(assunto) = TRIM(?)',
       whereArgs: [ordemGlobal, disciplina, assunto],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) {
+      return TarefaTrilha.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<TarefaTrilha?> buscarPrimeiraPorDisciplina(String disciplina) async {
+    Database db = await _dbHelper.database;
+    final maps = await db.query(
+      'tarefas_trilha',
+      where: 'TRIM(UPPER(disciplina)) = TRIM(UPPER(?))',
+      whereArgs: [disciplina],
+      orderBy: 'ordemGlobal ASC',
       limit: 1,
     );
 

@@ -10,6 +10,7 @@ class TrilhaController extends ChangeNotifier {
   final SessoesDao _sessoesDAO = SessoesDao();
 
   List<TarefaTrilha> _tarefas = [];
+  Map<String, int> _minutosPorDisciplinaSessoes = {};
   bool _isLoading = false;
 
   // CORREÇÃO: Campos marcados como final para satisfazer o linter,
@@ -26,8 +27,26 @@ class TrilhaController extends ChangeNotifier {
   // Getters para Métricas Globais
   int get totalMinutosPlanejados =>
       _tarefas.fold(0, (sum, t) => sum + t.chPlanejadaMin);
-  int get totalMinutosEfetivos =>
-      _tarefas.fold(0, (sum, t) => sum + (t.chEfetivaMin ?? 0));
+  int get totalMinutosEfetivos {
+    final realizadoPorTarefa = <String, int>{};
+    for (final t in _tarefas) {
+      final d = _normDisciplina(t.disciplina);
+      realizadoPorTarefa[d] = (realizadoPorTarefa[d] ?? 0) + (t.chEfetivaMin ?? 0);
+    }
+
+    final disciplinas = <String>{
+      ...realizadoPorTarefa.keys,
+      ..._minutosPorDisciplinaSessoes.keys,
+    };
+
+    int total = 0;
+    for (final d in disciplinas) {
+      final viaTarefa = realizadoPorTarefa[d] ?? 0;
+      final viaSessao = _minutosPorDisciplinaSessoes[d] ?? 0;
+      total += viaTarefa >= viaSessao ? viaTarefa : viaSessao;
+    }
+    return total;
+  }
 
   int get diasAtivos {
     final datasUnicas = _tarefas
@@ -62,8 +81,14 @@ class TrilhaController extends ChangeNotifier {
 
     Map<String, Map<String, double>> resultados = {};
     planejado.forEach((disciplina, tempoTotal) {
+      final d = _normDisciplina(disciplina);
+      final realizadoViaTarefas = realizado[disciplina] ?? 0;
+      final realizadoViaSessoes = _minutosPorDisciplinaSessoes[d] ?? 0;
+      final realizadoFinal = realizadoViaTarefas >= realizadoViaSessoes
+          ? realizadoViaTarefas
+          : realizadoViaSessoes;
       double progresso = tempoTotal > 0
-          ? (realizado[disciplina] ?? 0) / tempoTotal
+          ? realizadoFinal / tempoTotal
           : 0;
       double precisao = (totalQuestoes[disciplina] ?? 0) > 0
           ? (acertos[disciplina] ?? 0) / totalQuestoes[disciplina]!
@@ -72,8 +97,8 @@ class TrilhaController extends ChangeNotifier {
       resultados[disciplina] = {
         'progresso': progresso,
         'precisao': precisao,
-        'minutosRealizados': realizado[disciplina] ?? 0,
-        'minutosPlanejados': tempoTotal,
+        'minutosRealizados': realizadoFinal.toDouble(),
+        'minutosPlanejados': tempoTotal.toDouble(),
       };
     });
     return resultados;
@@ -96,12 +121,21 @@ class TrilhaController extends ChangeNotifier {
     try {
       _tarefas = await _tarefasDAO.listarTodas();
       _tarefas.sort((a, b) => a.ordemGlobal.compareTo(b.ordemGlobal));
+      final sessoes = await _sessoesDAO.listarTodas();
+      final mapa = <String, int>{};
+      for (final s in sessoes) {
+        final d = _normDisciplina(s.disciplina);
+        mapa[d] = (mapa[d] ?? 0) + s.duracaoMinutos;
+      }
+      _minutosPorDisciplinaSessoes = mapa;
     } catch (e) {
       debugPrint("Erro ao carregar tarefas: $e");
     }
     _isLoading = false;
     notifyListeners();
   }
+
+  String _normDisciplina(String s) => s.trim().toUpperCase();
 
   /// LÓGICA DE AGRUPAMENTO (PDF): (ordem - 1) ~/ 25
   Map<int, List<TarefaTrilha>> get tarefasAgrupadasPorTrilha {
@@ -202,7 +236,30 @@ Future<void> registrarTempoCronometro({
       );
     }
 
-    if (tarefa == null) return;
+    if (tarefa == null && tarefaId != null) {
+      final indexMemoria = _tarefas.indexWhere((t) => t.id == tarefaId);
+      if (indexMemoria >= 0) tarefa = _tarefas[indexMemoria];
+    }
+
+    if (tarefa == null && disciplina != null) {
+      tarefa = await _tarefasDAO.buscarPrimeiraPorDisciplina(disciplina);
+    }
+
+    if (tarefa == null) {
+      if (disciplina != null && disciplina.trim().isNotEmpty) {
+        final sessaoSemTarefa = SessaoEstudo(
+          tarefaId: 0,
+          disciplina: disciplina,
+          dataInicio: DateTime.now(),
+          duracaoMinutos: minutos,
+          questoesFeitas: 0,
+          questoesAcertadas: 0,
+        );
+        await _sessoesDAO.inserir(sessaoSemTarefa);
+        await carregarTarefas();
+      }
+      return;
+    }
 
     final tarefaAtualizada = TarefaTrilha(
       id: tarefa.id,
@@ -224,10 +281,44 @@ Future<void> registrarTempoCronometro({
       dataProximaRevisao: tarefa.dataProximaRevisao,
     );
 
+    int linhasAfetadas = 0;
     if (tarefaAtualizada.id != null) {
-      await _tarefasDAO.atualizar(tarefaAtualizada);
-    } else {
-      await _tarefasDAO.atualizarPorChaveLogica(tarefaAtualizada);
+      linhasAfetadas = await _tarefasDAO.atualizar(tarefaAtualizada);
+    }
+    if (linhasAfetadas == 0) {
+      linhasAfetadas = await _tarefasDAO.atualizarPorChaveLogica(
+        tarefaAtualizada,
+      );
+    }
+
+    if (linhasAfetadas == 0 && disciplina != null) {
+      final porDisciplina = await _tarefasDAO.buscarPrimeiraPorDisciplina(
+        disciplina,
+      );
+      if (porDisciplina != null) {
+        final fallback = TarefaTrilha(
+          id: porDisciplina.id,
+          ordemGlobal: porDisciplina.ordemGlobal,
+          disciplina: porDisciplina.disciplina,
+          assunto: porDisciplina.assunto,
+          duracaoMinutos: porDisciplina.duracaoMinutos,
+          chPlanejadaMin: porDisciplina.chPlanejadaMin,
+          concluida: porDisciplina.concluida,
+          descricao: porDisciplina.descricao,
+          fonteQuestoes: porDisciplina.fonteQuestoes,
+          questoes: porDisciplina.questoes,
+          acertos: porDisciplina.acertos,
+          trilha: porDisciplina.trilha,
+          tarefaCodigo: porDisciplina.tarefaCodigo,
+          chEfetivaMin: (porDisciplina.chEfetivaMin ?? 0) + minutos,
+          estagioRevisao: porDisciplina.estagioRevisao,
+          dataConclusao: porDisciplina.dataConclusao,
+          dataProximaRevisao: porDisciplina.dataProximaRevisao,
+        );
+        if (fallback.id != null) {
+          await _tarefasDAO.atualizar(fallback);
+        }
+      }
     }
 
     final sessao = SessaoEstudo(

@@ -41,7 +41,9 @@ class TelaCronometro extends StatelessWidget {
                     onPressed: () async {
                       final tarefaId = controller.tarefaAtivaId;
                       final ordemGlobal = controller.tarefaAtivaOrdemGlobal;
-                      final disciplina = controller.tarefaAtivaDisciplina;
+                      final disciplina =
+                          controller.tarefaAtivaDisciplina ??
+                          controller.disciplinaAtiva?.nome;
                       final assunto = controller.tarefaAtivaAssunto;
                       final minutos = controller.finalizarSessaoEmMinutos();
 
