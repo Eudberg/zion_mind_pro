@@ -38,15 +38,21 @@ class TelaCronometro extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                     onPressed: () async {
+                    onPressed: () async {
                       final tarefaId = controller.tarefaAtivaId;
+                      final ordemGlobal = controller.tarefaAtivaOrdemGlobal;
+                      final disciplina = controller.tarefaAtivaDisciplina;
+                      final assunto = controller.tarefaAtivaAssunto;
                       final minutos = controller.finalizarSessaoEmMinutos();
 
-                      if (tarefaId != null && minutos > 0) {
+                      if (minutos > 0) {
                         await context
                             .read<TrilhaController>()
                             .registrarTempoCronometro(
                               tarefaId: tarefaId,
+                              ordemGlobal: ordemGlobal,
+                              disciplina: disciplina,
+                              assunto: assunto,
                               minutos: minutos,
                             );
                       }

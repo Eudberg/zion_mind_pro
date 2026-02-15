@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/trilha_controller.dart';
 import '../controllers/estudo_controller.dart';
-import '../models/disciplina.dart';
 import '../models/tarefa_trilha.dart';
 import 'tela_cronometro.dart';
 
@@ -349,12 +348,7 @@ class _Header extends StatelessWidget {
                   ),
                   onPressed: () {
                     if (!cronometroDaTarefa) {
-                      estudoController.iniciarSessao(
-                        Disciplina(
-                          nome: tarefa.disciplina,
-                          minutosEstudados: tarefa.chEfetivaMin ?? 0,
-                        ),
-                      );
+                      estudoController.iniciarSessaoTarefa(tarefa);
                     }
 
                     Navigator.push(

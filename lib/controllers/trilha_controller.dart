@@ -177,12 +177,31 @@ class TrilhaController extends ChangeNotifier {
   }
 
 Future<void> registrarTempoCronometro({
-    required int tarefaId,
+    int? tarefaId,
+    int? ordemGlobal,
+    String? disciplina,
+    String? assunto,
     required int minutos,
   }) async {
     if (minutos <= 0) return;
 
-    final tarefa = await _tarefasDAO.buscarPorId(tarefaId);
+    TarefaTrilha? tarefa;
+
+    if (tarefaId != null) {
+      tarefa = await _tarefasDAO.buscarPorId(tarefaId);
+    }
+
+    if (tarefa == null &&
+        ordemGlobal != null &&
+        disciplina != null &&
+        assunto != null) {
+      tarefa = await _tarefasDAO.buscarPorChaveLogica(
+        ordemGlobal: ordemGlobal,
+        disciplina: disciplina,
+        assunto: assunto,
+      );
+    }
+
     if (tarefa == null) return;
 
     final tarefaAtualizada = TarefaTrilha(
@@ -205,10 +224,14 @@ Future<void> registrarTempoCronometro({
       dataProximaRevisao: tarefa.dataProximaRevisao,
     );
 
-    await _tarefasDAO.atualizar(tarefaAtualizada);
+    if (tarefaAtualizada.id != null) {
+      await _tarefasDAO.atualizar(tarefaAtualizada);
+    } else {
+      await _tarefasDAO.atualizarPorChaveLogica(tarefaAtualizada);
+    }
 
     final sessao = SessaoEstudo(
-      tarefaId: tarefaId,
+      tarefaId: tarefa.id ?? 0,
       disciplina: tarefa.disciplina,
       dataInicio: DateTime.now(),
       duracaoMinutos: minutos,
