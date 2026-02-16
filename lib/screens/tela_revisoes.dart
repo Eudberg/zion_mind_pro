@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../controllers/trilha_controller.dart';
+import '../models/tarefa_trilha.dart';
 import '../widgets/discipline_status_list.dart';
 
 class TelaRevisoes extends StatelessWidget {
@@ -8,71 +10,82 @@ class TelaRevisoes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Consumindo o Controller para obter os dados atualizados
     final controller = Provider.of<TrilhaController>(context);
 
-    // Estado de Carregamento
     if (controller.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Obtém a lista filtrada apenas para revisões futuras
-    final revisoesFuturas = controller.revisoesFuturas;
+    final programadas = controller.revisoesProgramadas;
+    final atrasadasHoje = controller.revisoesAtrasadasOuHoje;
+    final concluidas = controller.revisoesConcluidas;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Cabeçalho Simples
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Agendadas (${revisoesFuturas.length})",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              // Ícone informativo opcional
-              Tooltip(
-                message: "Tarefas que aparecerão na trilha no dia agendado.",
-                triggerMode: TooltipTriggerMode.tap,
-                child: Icon(
-                  Icons.info_outline,
-                  color: Colors.grey[600],
-                  size: 20,
-                ),
-              ),
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(text: 'Programadas'),
+              Tab(text: 'Atrasadas-Hoje'),
+              Tab(text: 'Concluidas'),
             ],
           ),
-        ),
-
-        // Lista de Revisões
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh:
-                controller.carregarTarefas, // Permite puxar pra atualizar
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  // Renderiza a lista de cards configurada para "Revisão"
-                  // (Isso muda as cores para verde e esconde o botão de check)
-                  DisciplineStatusList(
-                    tarefas: revisoesFuturas,
-                    isRevisaoTab: true,
-                  ),
-                  const SizedBox(height: 32), // Espaço extra no final
-                ],
-              ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _RevisaoTabContent(
+                  tarefas: programadas,
+                  isRevisaoTab: true,
+                  onRefresh: controller.carregarTarefas,
+                ),
+                _RevisaoTabContent(
+                  tarefas: atrasadasHoje,
+                  isRevisaoTab: false,
+                  onRefresh: controller.carregarTarefas,
+                ),
+                _RevisaoTabContent(
+                  tarefas: concluidas,
+                  isRevisaoTab: true,
+                  onRefresh: controller.carregarTarefas,
+                ),
+              ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RevisaoTabContent extends StatelessWidget {
+  final List<TarefaTrilha> tarefas;
+  final bool isRevisaoTab;
+  final Future<void> Function() onRefresh;
+
+  const _RevisaoTabContent({
+    required this.tarefas,
+    required this.isRevisaoTab,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            DisciplineStatusList(
+              tarefas: tarefas,
+              isRevisaoTab: isRevisaoTab,
+            ),
+            const SizedBox(height: 32),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

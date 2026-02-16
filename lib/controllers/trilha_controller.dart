@@ -682,6 +682,17 @@ Future<void> atualizarTarefaCampos(TarefaTrilha t) async {
     }).toList();
   }
 
+  List<TarefaTrilha> get revisoesProgramadas => revisoesFuturas;
+
+  List<TarefaTrilha> get revisoesConcluidas {
+    return _tarefas.where((t) {
+      return t.estagioRevisao >= 4 ||
+          (t.concluida == true &&
+              t.dataProximaRevisao == null &&
+              t.estagioRevisao >= 3);
+    }).toList();
+  }
+
 Future<void> importarTrilha(List<int> bytes) async {
     _isLoading = true;
     notifyListeners();
