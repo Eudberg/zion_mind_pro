@@ -43,6 +43,46 @@ class TarefaTrilha {
     this.dataProximaRevisao,
   });
 
+  TarefaTrilha copyWith({
+    int? id,
+    int? ordemGlobal,
+    String? disciplina,
+    String? assunto,
+    int? duracaoMinutos,
+    int? chPlanejadaMin,
+    bool? concluida,
+    String? descricao,
+    String? fonteQuestoes,
+    int? questoes,
+    int? acertos,
+    String? trilha,
+    String? tarefaCodigo,
+    int? chEfetivaMin,
+    int? estagioRevisao,
+    DateTime? dataConclusao,
+    DateTime? dataProximaRevisao,
+  }) {
+    return TarefaTrilha(
+      id: id ?? this.id,
+      ordemGlobal: ordemGlobal ?? this.ordemGlobal,
+      disciplina: disciplina ?? this.disciplina,
+      assunto: assunto ?? this.assunto,
+      duracaoMinutos: duracaoMinutos ?? this.duracaoMinutos,
+      chPlanejadaMin: chPlanejadaMin ?? this.chPlanejadaMin,
+      concluida: concluida ?? this.concluida,
+      descricao: descricao ?? this.descricao,
+      fonteQuestoes: fonteQuestoes ?? this.fonteQuestoes,
+      questoes: questoes ?? this.questoes,
+      acertos: acertos ?? this.acertos,
+      trilha: trilha ?? this.trilha,
+      tarefaCodigo: tarefaCodigo ?? this.tarefaCodigo,
+      chEfetivaMin: chEfetivaMin ?? this.chEfetivaMin,
+      estagioRevisao: estagioRevisao ?? this.estagioRevisao,
+      dataConclusao: dataConclusao ?? this.dataConclusao,
+      dataProximaRevisao: dataProximaRevisao ?? this.dataProximaRevisao,
+    );
+  }
+
   double get desempenhoCalculado {
     if (questoes == null || questoes == 0) return 0.0;
     return (acertos ?? 0) / questoes!;

@@ -37,7 +37,7 @@ class DbHelper {
         duracaoMinutos INTEGER,
         chPlanejadaMin INTEGER,
         concluida INTEGER,
-        
+
         -- Campos Legados restaurados
         descricao TEXT,
         fonteQuestoes TEXT,
@@ -78,30 +78,37 @@ class DbHelper {
     ''');
   }
 
+  Future<void> _safeExecute(Database db, String sql) async {
+    try {
+      await db.execute(sql);
+    } catch (_) {}
+  }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      try {
-        await db.execute(
-          'ALTER TABLE tarefas_trilha ADD COLUMN estagioRevisao INTEGER DEFAULT 0',
-        );
-        await db.execute(
-          'ALTER TABLE tarefas_trilha ADD COLUMN dataConclusao TEXT',
-        );
-        await db.execute(
-          'ALTER TABLE tarefas_trilha ADD COLUMN dataProximaRevisao TEXT',
-        );
-        // Garantindo colunas legados caso não existam
-        await db.execute(
-          'ALTER TABLE tarefas_trilha ADD COLUMN descricao TEXT',
-        );
-        await db.execute(
-          'ALTER TABLE tarefas_trilha ADD COLUMN fonteQuestoes TEXT',
-        );
-      } catch (e) {
-        print("Erro de migração (colunas já devem existir): $e");
-      }
+      await _safeExecute(
+        db,
+        'ALTER TABLE tarefas_trilha ADD COLUMN estagioRevisao INTEGER DEFAULT 0',
+      );
+      await _safeExecute(
+        db,
+        'ALTER TABLE tarefas_trilha ADD COLUMN dataConclusao TEXT',
+      );
+      await _safeExecute(
+        db,
+        'ALTER TABLE tarefas_trilha ADD COLUMN dataProximaRevisao TEXT',
+      );
+      // Garantindo colunas legados caso nao existam
+      await _safeExecute(
+        db,
+        'ALTER TABLE tarefas_trilha ADD COLUMN descricao TEXT',
+      );
+      await _safeExecute(
+        db,
+        'ALTER TABLE tarefas_trilha ADD COLUMN fonteQuestoes TEXT',
+      );
 
-      await db.execute('''
+      await _safeExecute(db, '''
         CREATE TABLE IF NOT EXISTS sessoes_estudo(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           tarefaId INTEGER,
@@ -110,6 +117,17 @@ class DbHelper {
           duracaoMinutos INTEGER,
           questoesFeitas INTEGER,
           questoesAcertadas INTEGER
+        )
+      ''');
+
+      await _safeExecute(db, '''
+        CREATE TABLE IF NOT EXISTS questoes(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          disciplina TEXT,
+          assunto TEXT,
+          quantidade INTEGER,
+          acertos INTEGER,
+          data TEXT
         )
       ''');
     }
