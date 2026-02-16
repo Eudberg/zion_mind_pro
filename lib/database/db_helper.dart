@@ -20,7 +20,7 @@ class DbHelper {
     String path = join(await getDatabasesPath(), 'zion_mind_pro.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -76,6 +76,29 @@ class DbHelper {
         data TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE materias(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        nomeNormalizado TEXT NOT NULL UNIQUE,
+        origem TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE assuntos(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        materiaId INTEGER NOT NULL,
+        nome TEXT NOT NULL,
+        nomeNormalizado TEXT NOT NULL,
+        origem TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        UNIQUE(materiaId, nomeNormalizado),
+        FOREIGN KEY(materiaId) REFERENCES materias(id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   Future<void> _safeExecute(Database db, String sql) async {
@@ -128,6 +151,31 @@ class DbHelper {
           quantidade INTEGER,
           acertos INTEGER,
           data TEXT
+        )
+      ''');
+    }
+
+    if (oldVersion < 3) {
+      await _safeExecute(db, '''
+        CREATE TABLE IF NOT EXISTS materias(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome TEXT NOT NULL,
+          nomeNormalizado TEXT NOT NULL UNIQUE,
+          origem TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+
+      await _safeExecute(db, '''
+        CREATE TABLE IF NOT EXISTS assuntos(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          materiaId INTEGER NOT NULL,
+          nome TEXT NOT NULL,
+          nomeNormalizado TEXT NOT NULL,
+          origem TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          UNIQUE(materiaId, nomeNormalizado),
+          FOREIGN KEY(materiaId) REFERENCES materias(id) ON DELETE CASCADE
         )
       ''');
     }

@@ -3,6 +3,8 @@ import '../models/tarefa_trilha.dart';
 import '../models/sessao_estudo.dart';
 import '../database/tarefas_trilha_dao.dart';
 import '../database/sessoes_dao.dart';
+import '../database/materias_dao.dart';
+import '../database/assuntos_dao.dart';
 import '../data/trilha_importer.dart';
 
 class TrilhaController extends ChangeNotifier {
@@ -136,6 +138,22 @@ class TrilhaController extends ChangeNotifier {
   }
 
   String _normDisciplina(String s) => s.trim().toUpperCase();
+
+  Future<void> syncCatalogoComTrilha() async {
+    final materiasDao = MateriasDao();
+    final assuntosDao = AssuntosDao();
+    for (final t in _tarefas) {
+      final materiaId = await materiasDao.upsertMateria(
+        nome: t.disciplina,
+        origem: 'trilha',
+      );
+      await assuntosDao.upsertAssunto(
+        materiaId: materiaId,
+        nome: t.assunto,
+        origem: 'trilha',
+      );
+    }
+  }
 
   /// LÓGICA DE AGRUPAMENTO (PDF): (ordem - 1) ~/ 25
   Map<int, List<TarefaTrilha>> get tarefasAgrupadasPorTrilha {
@@ -455,6 +473,7 @@ Future<void> importarTrilha(List<int> bytes) async {
       }
 
       await carregarTarefas();
+      await syncCatalogoComTrilha();
     } catch (e) {
       debugPrint("Erro na importação: $e");
     }
