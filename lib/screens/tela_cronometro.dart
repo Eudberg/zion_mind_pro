@@ -38,6 +38,40 @@ class TelaCronometro extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    onPressed: controller.pausarOuRetomar,
+                    icon: Icon(controller.estudando ? Icons.pause : Icons.play_arrow),
+                    label: Text(controller.estudando ? 'Pausar' : 'Retomar'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => controller.adicionarMinutos(1),
+                        child: const Text('+1 min'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => controller.adicionarMinutos(5),
+                        child: const Text('+5 min'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => controller.adicionarMinutos(15),
+                        child: const Text('+15 min'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
                     onPressed: () async {
                       final tarefaId = controller.tarefaAtivaId;
                       final ordemGlobal = controller.tarefaAtivaOrdemGlobal;

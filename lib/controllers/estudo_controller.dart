@@ -86,6 +86,19 @@ void pausarOuRetomar() {
     notifyListeners();  
     }
 
+  void adicionarMinutos(int minutos) {
+    if (minutos <= 0) return;
+
+    _segundosAcumulados += minutos * 60;
+    if (_inicioContagem == null) {
+      segundosSessao = _segundosAcumulados;
+    } else {
+      segundosSessao =
+          _segundosAcumulados + DateTime.now().difference(_inicioContagem!).inSeconds;
+    }
+    notifyListeners();
+  }
+
   int finalizarSessaoEmMinutos() {
     final tinhaSessao = disciplinaAtiva != null;
 
