@@ -13,61 +13,69 @@ class TelaEstatisticas extends StatelessWidget {
       backgroundColor: const Color(0xFF0F172A), // Slate 900
       body: Consumer<TrilhaController>(
         builder: (context, controller, _) {
-          // Buscamos as métricas calculadas no Controller
-          final metricas = controller.metricasPorMateria;
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: controller.metricasUnificadas(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          if (metricas.isEmpty) {
-            return const Center(
-              child: Text(
-                "Nenhum dado para exibir.\nImporte sua trilha e registre estudos.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38),
-              ),
-            );
-          }
+              final metricas = snapshot.data ?? [];
+              if (metricas.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Nenhum dado para exibir.\nImporte sua trilha e registre estudos.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white38),
+                  ),
+                );
+              }
 
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                "Tempo Estudado (min)",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  const Text(
+                    'Tempo Estudado (min)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ...metricas.map((e) {
+                    final minPlanejado = (e['minutosPlanejados'] as int?) ?? 0;
+                    final minRealizado = (e['minutosRealizados'] as int?) ?? 0;
+                    final progresso = minPlanejado > 0
+                        ? minRealizado / minPlanejado
+                        : 0.0;
 
-              // Geramos os cards de progresso para cada matéria
-              ...metricas.entries.map(
-                (e) => _MateriaProgressoCard(
-                  nome: e.key,
-                  progresso: e.value['progresso']!,
-                  minRealizado: e.value['minutosRealizados']!.toInt(),
-                  minTotal: e.value['minutosPlanejados']!.toInt(),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-              const Text(
-                "Desempenho (Questões)",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Geramos as linhas de precisão de acertos
-              ...metricas.entries.map(
-                (e) => _MateriaPrecisaoRow(
-                  nome: e.key,
-                  precisao: e.value['precisao']!,
-                ),
-              ),
-            ],
+                    return _MateriaProgressoCard(
+                      nome: (e['materia'] as String?) ?? '',
+                      progresso: progresso.clamp(0.0, 1.0),
+                      minRealizado: minRealizado,
+                      minTotal: minPlanejado,
+                    );
+                  }),
+                  const SizedBox(height: 30),
+                  const Text(
+                    'Desempenho (Questões)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ...metricas.map(
+                    (e) => _MateriaPrecisaoRow(
+                      nome: (e['materia'] as String?) ?? '',
+                      precisao: (e['desempenho'] as double?) ?? 0.0,
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -107,7 +115,7 @@ class _MateriaProgressoCard extends StatelessWidget {
                 ),
               ),
               Text(
-                "${(progresso * 100).toStringAsFixed(1)}%",
+                '${(progresso * 100).toStringAsFixed(1)}%',
                 style: const TextStyle(
                   color: Colors.blueAccent,
                   fontWeight: FontWeight.bold,
@@ -124,7 +132,7 @@ class _MateriaProgressoCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            "$minRealizado min de $minTotal min previstos",
+            '$minRealizado min de $minTotal min previstos',
             style: const TextStyle(color: Colors.white38, fontSize: 11),
           ),
         ],
@@ -141,6 +149,7 @@ class _MateriaPrecisaoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pct = (precisao * 100).toStringAsFixed(0);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -151,7 +160,7 @@ class _MateriaPrecisaoRow extends StatelessWidget {
             style: const TextStyle(color: Colors.white60, fontSize: 13),
           ),
           Text(
-            "${(precisao * 100).toInt()}%",
+            '$pct%',
             style: TextStyle(
               color: precisao > 0.7 ? Colors.green : Colors.orange,
               fontWeight: FontWeight.bold,
@@ -162,3 +171,4 @@ class _MateriaPrecisaoRow extends StatelessWidget {
     );
   }
 }
+

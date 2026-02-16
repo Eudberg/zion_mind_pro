@@ -1,10 +1,17 @@
 class Questao {
   final int? id;
+
+  /// Mantemos o nome "materia" no app (pra não quebrar telas e lógica),
+  /// mas no banco NOVO essa informação vai na coluna "disciplina".
   final String materia;
+
   final String assunto;
   final DateTime data;
-  final int qtdFeitas; // Variável em CamelCase
-  final int qtdAcertos; // Variável em CamelCase
+
+  /// Mantemos nomes camelCase no app,
+  /// mas no banco NOVO vira "quantidade" e "acertos".
+  final int qtdFeitas;
+  final int qtdAcertos;
 
   Questao({
     this.id,
@@ -15,34 +22,42 @@ class Questao {
     required this.qtdAcertos,
   });
 
-  // Calcula o desempenho automaticamente (ex: 85.0)
   double get desempenho {
     if (qtdFeitas == 0) return 0.0;
     return (qtdAcertos / qtdFeitas) * 100;
   }
 
-  // Envia para o Banco (usa chaves snake_case)
+  /// ✅ GRAVA no esquema NOVO (compatível com seu DbHelper atual)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'materia': materia,
+      'disciplina': materia, // <- era 'materia' no legado
       'assunto': assunto,
       'data': data.toIso8601String(),
-      'qtd_feitas': qtdFeitas, // Nome da variável
-      'qtd_acertos': qtdAcertos, // Nome da variável
+      'quantidade': qtdFeitas, // <- era 'qtd_feitas' no legado
+      'acertos': qtdAcertos, // <- era 'qtd_acertos' no legado
     };
   }
 
-  // Traz do Banco (converte snake_case para CamelCase)
+  /// ✅ LÊ tanto do esquema NOVO quanto do LEGADO
   factory Questao.fromMap(Map<String, dynamic> map) {
+    int asInt(dynamic v) => v == null ? 0 : (v as num).toInt();
+
+    final String materiaLida = (map['disciplina'] ?? map['materia'] ?? '')
+        .toString();
+
+    final String assuntoLido = (map['assunto'] ?? '').toString();
+
+    final String dataStr = (map['data'] ?? DateTime.now().toIso8601String())
+        .toString();
+
     return Questao(
-      id: map['id'],
-      materia: map['materia'],
-      assunto: map['assunto'] ?? '',
-      data: DateTime.parse(map['data']),
-      // CORREÇÃO AQUI: O lado esquerdo é a Classe, o lado direito é o Banco
-      qtdFeitas: map['qtd_feitas'],
-      qtdAcertos: map['qtd_acertos'],
+      id: map['id'] == null ? null : (map['id'] as num).toInt(),
+      materia: materiaLida,
+      assunto: assuntoLido,
+      data: DateTime.parse(dataStr),
+      qtdFeitas: asInt(map['quantidade'] ?? map['qtd_feitas']),
+      qtdAcertos: asInt(map['acertos'] ?? map['qtd_acertos']),
     );
   }
 }

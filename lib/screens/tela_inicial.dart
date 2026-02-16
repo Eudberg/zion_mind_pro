@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'tela_trilha.dart';
 import 'tela_revisoes.dart';
+import 'tela_questoes.dart';
 import 'tela_estatisticas.dart';
 import 'tela_configuracoes.dart';
 
@@ -19,7 +20,8 @@ class _TelaInicialState extends State<TelaInicial> {
   final List<Widget> _telas = [
     const TelaTrilha(), // Índice 0: Lista de tarefas organizada em blocos de 25
     const TelaRevisoes(), // Índice 1: Calendário de revisões agendadas
-    const TelaEstatisticas(), // Índice 2: Métricas de desempenho e tempo
+    const TelaQuestoes(), // Índice 2: Histórico e registro de questões
+    const TelaEstatisticas(), // Índice 3: Métricas de desempenho e tempo
   ];
 
   void _onItemTapped(int index) {
@@ -86,6 +88,13 @@ class _TelaInicialState extends State<TelaInicial> {
               child: Icon(Icons.loop),
             ),
             label: 'Revisões',
+          ),
+          BottomNavigationBarItem(
+            icon: Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Icon(Icons.help_outline),
+            ),
+            label: 'Questões',
           ),
           BottomNavigationBarItem(
             icon: Padding(

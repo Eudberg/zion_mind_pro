@@ -5,6 +5,7 @@ import '../database/tarefas_trilha_dao.dart';
 import '../database/sessoes_dao.dart';
 import '../database/materias_dao.dart';
 import '../database/assuntos_dao.dart';
+import '../database/questoes_dao.dart';
 import '../data/trilha_importer.dart';
 
 class TrilhaController extends ChangeNotifier {
@@ -138,6 +139,97 @@ class TrilhaController extends ChangeNotifier {
   }
 
   String _normDisciplina(String s) => s.trim().toUpperCase();
+  String _norm(String s) =>
+      s.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+  Future<Map<String, double>> desempenhoQuestoesPorMateria() async {
+    final agregados = await QuestoesDao().agregadosPorMateria();
+    final desempenho = <String, double>{};
+
+    agregados.forEach((materia, valores) {
+      final feitas = valores['feitas'] ?? 0;
+      final acertos = valores['acertos'] ?? 0;
+      final chave = _normDisciplina(materia);
+      desempenho[chave] = feitas == 0 ? 0.0 : acertos / feitas;
+    });
+
+    return desempenho;
+  }
+
+  Future<Map<String, double>> desempenhoPorMateriaCanonica() async {
+    final agg = await QuestoesDao().agregadosPorDisciplinaNormalizada();
+    final materias = await MateriasDao().listarOrdenado();
+    final out = <String, double>{};
+
+    for (final m in materias) {
+      final key = _norm(m.nome);
+      final data = agg[key];
+      final feitas = data?['feitas'] ?? 0;
+      final acertos = data?['acertos'] ?? 0;
+      out[m.nome] = feitas == 0 ? 0.0 : (acertos / feitas);
+    }
+
+    if (materias.isEmpty) {
+      final disciplinas = _tarefas
+          .map((t) => t.disciplina)
+          .toSet()
+          .toList()
+        ..sort();
+      for (final d in disciplinas) {
+        final key = _norm(d);
+        final data = agg[key];
+        final feitas = data?['feitas'] ?? 0;
+        final acertos = data?['acertos'] ?? 0;
+        out[d] = feitas == 0 ? 0.0 : (acertos / feitas);
+      }
+    }
+
+    return out;
+  }
+
+  Future<List<String>> listarMateriasParaMetricas() async {
+    final materiasCatalogo = await MateriasDao().listarOrdenado();
+    if (materiasCatalogo.isNotEmpty) {
+      return materiasCatalogo.map((m) => m.nome).toList();
+    }
+
+    final nomes = <String>{};
+    for (final t in _tarefas) {
+      final nome = t.disciplina.trim();
+      if (nome.isNotEmpty) nomes.add(nome);
+    }
+    final lista = nomes.toList();
+    lista.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return lista;
+  }
+
+  Future<List<Map<String, dynamic>>> metricasUnificadas() async {
+    final materias = await listarMateriasParaMetricas();
+    final desempenhoPorMateria = await desempenhoPorMateriaCanonica();
+
+    final lista = <Map<String, dynamic>>[];
+    for (final materia in materias) {
+      final chave = _normDisciplina(materia);
+
+      int minutosPlanejados = 0;
+      int minutosRealizados = 0;
+      for (final t in _tarefas) {
+        if (_normDisciplina(t.disciplina) == chave) {
+          minutosPlanejados += t.chPlanejadaMin;
+          minutosRealizados += t.chEfetivaMin ?? 0;
+        }
+      }
+
+      lista.add({
+        'materia': materia,
+        'minutosPlanejados': minutosPlanejados,
+        'minutosRealizados': minutosRealizados,
+        'desempenho': desempenhoPorMateria[materia] ?? 0.0,
+      });
+    }
+
+    return lista;
+  }
 
   Future<void> syncCatalogoComTrilha() async {
     final materiasDao = MateriasDao();
