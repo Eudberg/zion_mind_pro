@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'tela_inicio.dart';
 import 'tela_trilha.dart';
 import 'tela_revisoes.dart';
-import 'tela_questoes.dart';
 import 'tela_estatisticas.dart';
 import 'tela_configuracoes.dart';
 
@@ -18,9 +18,9 @@ class _TelaInicialState extends State<TelaInicial> {
 
   // Lista das telas principais que serão exibidas em cada aba
   final List<Widget> _telas = [
-    const TelaTrilha(), // Índice 0: Lista de tarefas organizada em blocos de 25
-    const TelaRevisoes(), // Índice 1: Calendário de revisões agendadas
-    const TelaQuestoes(), // Índice 2: Histórico e registro de questões
+    const TelaInicio(), // Índice 0: Dashboard
+    const TelaTrilha(), // Índice 1: Lista de tarefas organizada em blocos de 25
+    const TelaRevisoes(), // Índice 2: Calendário de revisões agendadas
     const TelaEstatisticas(), // Índice 3: Métricas de desempenho e tempo
   ];
 
@@ -78,6 +78,13 @@ class _TelaInicialState extends State<TelaInicial> {
           BottomNavigationBarItem(
             icon: Padding(
               padding: EdgeInsets.only(bottom: 4),
+              child: Icon(Icons.home_outlined),
+            ),
+            label: 'Início',
+          ),
+          BottomNavigationBarItem(
+            icon: Padding(
+              padding: EdgeInsets.only(bottom: 4),
               child: Icon(Icons.list_alt),
             ),
             label: 'Trilha',
@@ -88,13 +95,6 @@ class _TelaInicialState extends State<TelaInicial> {
               child: Icon(Icons.loop),
             ),
             label: 'Revisões',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.only(bottom: 4),
-              child: Icon(Icons.help_outline),
-            ),
-            label: 'Questões',
           ),
           BottomNavigationBarItem(
             icon: Padding(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/tarefa_trilha.dart';
 import '../models/sessao_estudo.dart';
 import '../database/tarefas_trilha_dao.dart';
@@ -15,6 +16,7 @@ class TrilhaController extends ChangeNotifier {
   List<TarefaTrilha> _tarefas = [];
   Map<String, int> _minutosPorDisciplinaSessoes = {};
   bool _isLoading = false;
+  int _metaMinutosDia = 120;
 
   // CORREÇÃO: Campos marcados como final para satisfazer o linter,
   // já que não são reatribuídos diretamente (apenas seus conteúdos mudam).
@@ -26,6 +28,7 @@ class TrilhaController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   DateTime get dataSelecionada => _dataSelecionada;
   List<dynamic> get planoDoDia => _planoDoDia;
+  int get metaMinutosDia => _metaMinutosDia;
 
   // Getters para Métricas Globais
   int get totalMinutosPlanejados =>
@@ -114,7 +117,12 @@ class TrilhaController extends ChangeNotifier {
   };
 
   TrilhaController() {
-    carregarTarefas();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await carregarTarefas();
+    await carregarPrefsPlanoDia();
   }
 
   /// REATIVIDADE: Método central de carregamento que aciona o notifyListeners()
@@ -141,6 +149,139 @@ class TrilhaController extends ChangeNotifier {
   String _normDisciplina(String s) => s.trim().toUpperCase();
   String _norm(String s) =>
       s.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  int get minutosHoje {
+    final hoje = _dateOnly(DateTime.now());
+    return _tarefas
+        .where((t) => t.dataConclusao != null && _dateOnly(t.dataConclusao!) == hoje)
+        .fold(0, (sum, t) => sum + (t.chEfetivaMin ?? 0));
+  }
+
+  int get minutosSemana {
+    final hoje = _dateOnly(DateTime.now());
+    final inicio = hoje.subtract(const Duration(days: 6));
+    return _tarefas.where((t) {
+      if (t.dataConclusao == null) return false;
+      final d = _dateOnly(t.dataConclusao!);
+      return (d.isAfter(inicio) || d.isAtSameMomentAs(inicio)) &&
+          (d.isBefore(hoje) || d.isAtSameMomentAs(hoje));
+    }).fold(0, (sum, t) => sum + (t.chEfetivaMin ?? 0));
+  }
+
+  List<bool> get ultimos14DiasAtivos {
+    final hoje = _dateOnly(DateTime.now());
+    final ativos = _tarefas
+        .where((t) => t.dataConclusao != null)
+        .map((t) => _dateOnly(t.dataConclusao!))
+        .toSet();
+
+    final dias = <bool>[];
+    for (int i = 13; i >= 0; i--) {
+      final dia = hoje.subtract(Duration(days: i));
+      dias.add(ativos.contains(dia));
+    }
+    return dias;
+  }
+
+  int get streakAtual {
+    final ativos = _tarefas
+        .where((t) => t.dataConclusao != null)
+        .map((t) => _dateOnly(t.dataConclusao!))
+        .toSet();
+
+    int streak = 0;
+    DateTime cursor = _dateOnly(DateTime.now());
+    while (ativos.contains(cursor)) {
+      streak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  int get recordeStreak {
+    final dias = _tarefas
+        .where((t) => t.dataConclusao != null)
+        .map((t) => _dateOnly(t.dataConclusao!))
+        .toSet()
+        .toList()
+      ..sort();
+
+    if (dias.isEmpty) return 0;
+
+    int melhor = 1;
+    int atual = 1;
+    for (int i = 1; i < dias.length; i++) {
+      final diff = dias[i].difference(dias[i - 1]).inDays;
+      if (diff == 1) {
+        atual++;
+      } else {
+        atual = 1;
+      }
+      if (atual > melhor) melhor = atual;
+    }
+    return melhor;
+  }
+
+  List<TarefaTrilha> get revisoesAtrasadasOuHoje {
+    final hoje = _dateOnly(DateTime.now());
+    return _tarefas.where((t) {
+      if (t.concluida) return false;
+      if (t.dataProximaRevisao == null) return false;
+      final rev = _dateOnly(t.dataProximaRevisao!);
+      return rev.isBefore(hoje) || rev.isAtSameMomentAs(hoje);
+    }).toList();
+  }
+
+  List<TarefaTrilha> get prioridadePendentes {
+    final lista = List<TarefaTrilha>.from(tarefasPendentes);
+    final hoje = _dateOnly(DateTime.now());
+    bool isRevisaoAtrasadaOuHoje(TarefaTrilha t) {
+      if (t.concluida || t.dataProximaRevisao == null) return false;
+      final rev = _dateOnly(t.dataProximaRevisao!);
+      return rev.isBefore(hoje) || rev.isAtSameMomentAs(hoje);
+    }
+
+    lista.sort((a, b) {
+      final aRev = isRevisaoAtrasadaOuHoje(a);
+      final bRev = isRevisaoAtrasadaOuHoje(b);
+      if (aRev != bRev) return aRev ? -1 : 1;
+
+      final aInicial = a.estagioRevisao == 0;
+      final bInicial = b.estagioRevisao == 0;
+      if (aInicial != bInicial) return aInicial ? -1 : 1;
+
+      return a.ordemGlobal.compareTo(b.ordemGlobal);
+    });
+    return lista;
+  }
+
+  List<TarefaTrilha> get sugestoesPlanoDia {
+    if (_metaMinutosDia <= 0) return [];
+    final sugestoes = <TarefaTrilha>[];
+    int acumulado = 0;
+
+    for (final t in prioridadePendentes) {
+      sugestoes.add(t);
+      acumulado += t.chPlanejadaMin;
+      if (acumulado >= _metaMinutosDia) break;
+    }
+
+    return sugestoes;
+  }
+
+  Future<void> carregarPrefsPlanoDia() async {
+    final prefs = await SharedPreferences.getInstance();
+    _metaMinutosDia = prefs.getInt('metaMinutosDia') ?? 120;
+    notifyListeners();
+  }
+
+  Future<void> setMetaMinutosDia(int valor) async {
+    _metaMinutosDia = valor;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('metaMinutosDia', valor);
+    notifyListeners();
+  }
 
   Future<Map<String, double>> desempenhoQuestoesPorMateria() async {
     final agregados = await QuestoesDao().agregadosPorMateria();
