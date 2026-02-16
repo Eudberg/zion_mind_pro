@@ -228,6 +228,10 @@ class TrilhaController extends ChangeNotifier {
     return _tarefas.where((t) {
       if (t.concluida) return false;
       if (t.dataProximaRevisao == null) return false;
+      if (t.dataIgnorarRevisaoAte != null) {
+        final ign = _dateOnly(t.dataIgnorarRevisaoAte!);
+        if (ign.isAfter(hoje)) return false;
+      }
       final rev = _dateOnly(t.dataProximaRevisao!);
       return rev.isBefore(hoje) || rev.isAtSameMomentAs(hoje);
     }).toList();
@@ -653,18 +657,51 @@ Future<void> atualizarTarefaCampos(TarefaTrilha t) async {
     final today = DateTime(now.year, now.month, now.day);
     return _tarefas.where((t) {
       if (t.estagioRevisao == 0 && !t.concluida) return true;
-      if (t.dataProximaRevisao != null) {
+      if (t.concluida && t.dataProximaRevisao != null) {
         final revDate = t.dataProximaRevisao!;
         final revDateNormalized = DateTime(
           revDate.year,
           revDate.month,
           revDate.day,
         );
-        return revDateNormalized.isBefore(today) ||
+        final isRevisaoPendente =
+            revDateNormalized.isBefore(today) ||
             revDateNormalized.isAtSameMomentAs(today);
+        if (!isRevisaoPendente) return false;
+
+        if (t.dataIgnorarRevisaoAte != null) {
+          final ignorarAte = t.dataIgnorarRevisaoAte!;
+          final ignorarAteNormalizado = DateTime(
+            ignorarAte.year,
+            ignorarAte.month,
+            ignorarAte.day,
+          );
+          if (ignorarAteNormalizado.isAfter(today)) {
+            return false;
+          }
+        }
+        return true;
       }
       return false;
     }).toList();
+  }
+
+  Future<void> ignorarRevisao(TarefaTrilha tarefa, {int dias = 1}) async {
+    if (dias <= 0) dias = 1;
+
+    final now = DateTime.now();
+    final hoje = DateTime(now.year, now.month, now.day);
+    final limite = hoje.add(Duration(days: dias));
+
+    final copia = tarefa.copyWith(dataIgnorarRevisaoAte: limite);
+    await _tarefasDAO.atualizar(copia);
+
+    final index = _tarefas.indexWhere((t) => t.id == tarefa.id);
+    if (index >= 0) {
+      _tarefas[index] = copia;
+    }
+
+    notifyListeners();
   }
 
   List<TarefaTrilha> get revisoesFuturas {

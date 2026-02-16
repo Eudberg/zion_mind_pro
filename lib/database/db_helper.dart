@@ -20,7 +20,7 @@ class DbHelper {
     String path = join(await getDatabasesPath(), 'zion_mind_pro.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -50,7 +50,8 @@ class DbHelper {
         -- Novos Campos (7-30-60)
         estagioRevisao INTEGER DEFAULT 0,
         dataConclusao TEXT,
-        dataProximaRevisao TEXT
+        dataProximaRevisao TEXT,
+        dataIgnorarRevisaoAte TEXT
       )
     ''');
 
@@ -178,6 +179,13 @@ class DbHelper {
           FOREIGN KEY(materiaId) REFERENCES materias(id) ON DELETE CASCADE
         )
       ''');
+    }
+
+    if (oldVersion < 4) {
+      await _safeExecute(
+        db,
+        'ALTER TABLE tarefas_trilha ADD COLUMN dataIgnorarRevisaoAte TEXT',
+      );
     }
   }
 }

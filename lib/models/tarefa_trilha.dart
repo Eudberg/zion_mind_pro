@@ -20,6 +20,7 @@ class TarefaTrilha {
   int estagioRevisao;
   DateTime? dataConclusao;
   DateTime? dataProximaRevisao;
+  DateTime? dataIgnorarRevisaoAte;
 
   TarefaTrilha({
     this.id, // Opcional
@@ -41,6 +42,7 @@ class TarefaTrilha {
     this.estagioRevisao = 0,
     this.dataConclusao,
     this.dataProximaRevisao,
+    this.dataIgnorarRevisaoAte,
   });
 
   TarefaTrilha copyWith({
@@ -61,6 +63,7 @@ class TarefaTrilha {
     int? estagioRevisao,
     DateTime? dataConclusao,
     DateTime? dataProximaRevisao,
+    DateTime? dataIgnorarRevisaoAte,
   }) {
     return TarefaTrilha(
       id: id ?? this.id,
@@ -80,6 +83,8 @@ class TarefaTrilha {
       estagioRevisao: estagioRevisao ?? this.estagioRevisao,
       dataConclusao: dataConclusao ?? this.dataConclusao,
       dataProximaRevisao: dataProximaRevisao ?? this.dataProximaRevisao,
+      dataIgnorarRevisaoAte:
+          dataIgnorarRevisaoAte ?? this.dataIgnorarRevisaoAte,
     );
   }
 
@@ -107,6 +112,7 @@ class TarefaTrilha {
       'estagioRevisao': estagioRevisao,
       'dataConclusao': dataConclusao?.toIso8601String(),
       'dataProximaRevisao': dataProximaRevisao?.toIso8601String(),
+      'dataIgnorarRevisaoAte': dataIgnorarRevisaoAte?.toIso8601String(),
     };
   }
 
@@ -132,6 +138,11 @@ class TarefaTrilha {
           : null,
       dataProximaRevisao: map['dataProximaRevisao'] != null
           ? DateTime.parse(map['dataProximaRevisao'])
+          : null,
+      dataIgnorarRevisaoAte:
+          map.containsKey('dataIgnorarRevisaoAte') &&
+              map['dataIgnorarRevisaoAte'] != null
+          ? DateTime.parse(map['dataIgnorarRevisaoAte'])
           : null,
     );
   }

@@ -43,9 +43,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
           final data = controller.dataSelecionada;
           final itens = controller.planoDoDia;
 
-          final tarefasDia = itens
-              .where((item) => item.tipo == 'estudo')
-              .toList();
+          final tarefasDia = itens.where((item) => item.tipo == 'estudo').toList();
           final revisoes = itens
               .where((item) => item.tipo != null && item.tipo != 'estudo')
               .toList();
@@ -59,9 +57,10 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                   children: [
                     Text(
                       _dateFormat.format(data),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(color: Colors.white),
                     ),
                     const Spacer(),
                     Container(
@@ -74,7 +73,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        "${tarefasDia.length + revisoes.length} Meta",
+                        '${tarefasDia.length + revisoes.length} Meta',
                         style: const TextStyle(
                           color: Colors.blueAccent,
                           fontWeight: FontWeight.bold,
@@ -100,12 +99,12 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                         ...tarefasDia.map((item) => _PlanoCard(item: item)),
                       const SizedBox(height: 20),
                       _SectionTitle(
-                        title: 'Revisões do dia',
+                        title: 'Revisoes do dia',
                         count: revisoes.length,
                       ),
                       const SizedBox(height: 12),
                       if (revisoes.isEmpty)
-                        const _EmptyCard(text: 'Nenhuma revisão prevista.'),
+                        const _EmptyCard(text: 'Nenhuma revisao prevista.'),
                       if (revisoes.isNotEmpty)
                         ...revisoes.map((item) => _PlanoCard(item: item)),
                       const SizedBox(height: 40),
@@ -132,9 +131,10 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: Colors.white70),
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(color: Colors.white70),
         ),
         const SizedBox(width: 8),
         Container(
@@ -165,11 +165,13 @@ class _PlanoCard extends StatelessWidget {
         : null;
 
     final titulo = tarefa?.disciplina ?? 'Tarefa';
-    final descricao = tarefa?.descricao ?? 'Sem descrição';
+    final descricao = tarefa?.descricao ?? 'Sem descricao';
     final minutos = item.minutosSugeridos?.toString() ?? '--';
     final tipo = item.tipo ?? 'estudo';
     final estaConcluido = tarefa?.concluida ?? false;
-    final dataConclusao = tarefa?.dataConclusao; // Já é DateTime?
+    final dataConclusao = tarefa?.dataConclusao;
+    final mostrarIgnorar =
+        tipo == 'revisao' && tarefa != null && tarefa.dataProximaRevisao != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -203,9 +205,7 @@ class _PlanoCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    decoration: estaConcluido
-                        ? TextDecoration.lineThrough
-                        : null,
+                    decoration: estaConcluido ? TextDecoration.lineThrough : null,
                     color: estaConcluido ? Colors.white54 : Colors.white,
                   ),
                 ),
@@ -237,7 +237,6 @@ class _PlanoCard extends StatelessWidget {
               InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () async {
-                  // CORREÇÃO: dataConclusao já é DateTime, não precisa de parse
                   final dataAtual = dataConclusao ?? DateTime.now();
 
                   final novaData = await showDatePicker(
@@ -266,18 +265,14 @@ class _PlanoCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        estaConcluido
-                            ? Icons.edit_calendar
-                            : Icons.check_circle_outline,
+                        estaConcluido ? Icons.edit_calendar : Icons.check_circle_outline,
                         size: 14,
                         color: Colors.white,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        estaConcluido
-                            ? DateFormat('dd/MM').format(
-                                dataConclusao!,
-                              ) // CORREÇÃO: format direto no DateTime
+                        estaConcluido && dataConclusao != null
+                            ? DateFormat('dd/MM').format(dataConclusao)
                             : 'Concluir',
                         style: const TextStyle(
                           fontSize: 12,
@@ -290,6 +285,23 @@ class _PlanoCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
+              if (mostrarIgnorar)
+                TextButton(
+                  onPressed: () async {
+                    await Provider.of<TrilhaController>(
+                      context,
+                      listen: false,
+                    ).ignorarRevisao(tarefa, dias: 1);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Revisão ignorada por 1 dia'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Ignorar'),
+                ),
               Text(
                 '$minutos min',
                 style: const TextStyle(
