@@ -1,81 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../controllers/trilha_controller.dart';
 
-/// ESTA É A CLASSE QUE ESTAVA FALTANDO: TelaEstatisticas
-/// Certifique-se de que o nome está exatamente assim.
-class TelaEstatisticas extends StatelessWidget {
+import '../controllers/trilha_controller.dart';
+import '../models/periodo_metrica.dart';
+
+class TelaEstatisticas extends StatefulWidget {
   const TelaEstatisticas({super.key});
+
+  @override
+  State<TelaEstatisticas> createState() => _TelaEstatisticasState();
+}
+
+class _TelaEstatisticasState extends State<TelaEstatisticas> {
+  PeriodoMetrica _periodoSelecionado = PeriodoMetrica.total;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Slate 900
+      backgroundColor: const Color(0xFF0F172A),
       body: Consumer<TrilhaController>(
         builder: (context, controller, _) {
-          return FutureBuilder<List<Map<String, dynamic>>>(
-            future: controller.metricasUnificadas(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          final metricas = controller.metricasPorMateriaPeriodo(_periodoSelecionado);
 
-              final metricas = snapshot.data ?? [];
-              if (metricas.isEmpty) {
-                return const Center(
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              ToggleButtons(
+                isSelected: [
+                  _periodoSelecionado == PeriodoMetrica.hoje,
+                  _periodoSelecionado == PeriodoMetrica.semana,
+                  _periodoSelecionado == PeriodoMetrica.mes,
+                  _periodoSelecionado == PeriodoMetrica.total,
+                ],
+                onPressed: (index) {
+                  setState(() {
+                    _periodoSelecionado = PeriodoMetrica.values[index];
+                  });
+                },
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('Hoje'),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('Semana'),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('Mes'),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('Total'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (metricas.isEmpty)
+                const Center(
                   child: Text(
-                    'Nenhum dado para exibir.\nImporte sua trilha e registre estudos.',
+                    'Nenhum dado para exibir neste periodo.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white38),
                   ),
-                );
-              }
-
-              return ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  const Text(
-                    'Tempo Estudado (min)',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                )
+              else ...[
+                const Text(
+                  'Tempo Estudado (min)',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 20),
-                  ...metricas.map((e) {
-                    final minPlanejado = (e['minutosPlanejados'] as int?) ?? 0;
-                    final minRealizado = (e['minutosRealizados'] as int?) ?? 0;
-                    final progresso = minPlanejado > 0
-                        ? minRealizado / minPlanejado
-                        : 0.0;
-
-                    return _MateriaProgressoCard(
-                      nome: (e['materia'] as String?) ?? '',
-                      progresso: progresso.clamp(0.0, 1.0),
-                      minRealizado: minRealizado,
-                      minTotal: minPlanejado,
-                    );
-                  }),
-                  const SizedBox(height: 30),
-                  const Text(
-                    'Desempenho (Questões)',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                const SizedBox(height: 20),
+                ...metricas.entries.map(
+                  (e) => _MateriaProgressoCard(
+                    nome: e.key,
+                    progresso: e.value['progresso'] ?? 0.0,
+                    minRealizado: (e.value['minutosRealizados'] ?? 0).toInt(),
+                    minTotal: (e.value['minutosPlanejados'] ?? 0).toInt(),
                   ),
-                  const SizedBox(height: 20),
-                  ...metricas.map(
-                    (e) => _MateriaPrecisaoRow(
-                      nome: (e['materia'] as String?) ?? '',
-                      precisao: (e['desempenho'] as double?) ?? 0.0,
-                    ),
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'Desempenho (Questoes)',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              );
-            },
+                ),
+                const SizedBox(height: 20),
+                ...metricas.entries.map(
+                  (e) => _MateriaPrecisaoRow(
+                    nome: e.key,
+                    precisao: e.value['precisao'] ?? 0.0,
+                  ),
+                ),
+              ],
+            ],
           );
         },
       ),
@@ -125,7 +150,7 @@ class _MateriaProgressoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           LinearProgressIndicator(
-            value: progresso,
+            value: progresso.clamp(0.0, 1.0),
             backgroundColor: Colors.white10,
             color: Colors.blueAccent,
             minHeight: 8,
@@ -171,4 +196,3 @@ class _MateriaPrecisaoRow extends StatelessWidget {
     );
   }
 }
-

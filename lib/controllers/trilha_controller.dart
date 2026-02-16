@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/tarefa_trilha.dart';
 import '../models/sessao_estudo.dart';
+import '../models/periodo_metrica.dart';
 import '../database/tarefas_trilha_dao.dart';
 import '../database/sessoes_dao.dart';
 import '../database/materias_dao.dart';
@@ -107,6 +108,74 @@ class TrilhaController extends ChangeNotifier {
         'minutosPlanejados': tempoTotal.toDouble(),
       };
     });
+    return resultados;
+  }
+
+  Map<String, Map<String, double>> metricasPorMateriaPeriodo(PeriodoMetrica p) {
+    if (p == PeriodoMetrica.total) {
+      return metricasPorMateria;
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    DateTime inicio = today;
+
+    if (p == PeriodoMetrica.semana) {
+      inicio = today.subtract(const Duration(days: 6));
+    } else if (p == PeriodoMetrica.mes) {
+      inicio = today.subtract(const Duration(days: 29));
+    }
+
+    bool incluiNoPeriodo(DateTime? dataConclusao) {
+      if (dataConclusao == null) return false;
+      final d = DateTime(
+        dataConclusao.year,
+        dataConclusao.month,
+        dataConclusao.day,
+      );
+      if (p == PeriodoMetrica.hoje) {
+        return d == today;
+      }
+      return (d.isAfter(inicio) || d.isAtSameMomentAs(inicio)) &&
+          (d.isBefore(today) || d.isAtSameMomentAs(today));
+    }
+
+    final planejado = <String, double>{};
+    final realizado = <String, double>{};
+    final acertos = <String, double>{};
+    final totalQuestoes = <String, double>{};
+
+    for (final t in _tarefas) {
+      if (!incluiNoPeriodo(t.dataConclusao)) continue;
+
+      planejado[t.disciplina] =
+          (planejado[t.disciplina] ?? 0) + t.chPlanejadaMin;
+      realizado[t.disciplina] =
+          (realizado[t.disciplina] ?? 0) + (t.chEfetivaMin ?? 0);
+
+      if (t.questoes != null && t.questoes! > 0) {
+        totalQuestoes[t.disciplina] =
+            (totalQuestoes[t.disciplina] ?? 0) + t.questoes!;
+        acertos[t.disciplina] = (acertos[t.disciplina] ?? 0) + (t.acertos ?? 0);
+      }
+    }
+
+    final resultados = <String, Map<String, double>>{};
+    planejado.forEach((disciplina, tempoTotal) {
+      final realizadoFinal = realizado[disciplina] ?? 0;
+      final progresso = tempoTotal > 0 ? realizadoFinal / tempoTotal : 0.0;
+      final precisao = (totalQuestoes[disciplina] ?? 0) > 0
+          ? (acertos[disciplina] ?? 0) / totalQuestoes[disciplina]!
+          : 0.0;
+
+      resultados[disciplina] = {
+        'progresso': progresso,
+        'precisao': precisao,
+        'minutosRealizados': realizadoFinal.toDouble(),
+        'minutosPlanejados': tempoTotal.toDouble(),
+      };
+    });
+
     return resultados;
   }
 
