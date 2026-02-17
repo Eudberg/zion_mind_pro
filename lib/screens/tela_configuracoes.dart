@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../controllers/trilha_controller.dart';
+import '../services/backup_service.dart';
 
 class TelaConfiguracoes extends StatelessWidget {
   const TelaConfiguracoes({super.key});
@@ -60,6 +61,67 @@ class TelaConfiguracoes extends StatelessWidget {
           const ListTile(
             title: Text("Zion Mind Pro"),
             subtitle: Text("Versão 1.0.0 - Sistema de Revisão 7-30-60"),
+          ),
+          ListTile(
+            tileColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            title: const Text("Limpar todos os dados"),
+            subtitle: const Text("Remove trilhas, sessões e histórico"),
+            onTap: () async {
+              final confirmar = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text("Confirmação"),
+                  content: const Text(
+                    "Tem certeza que deseja apagar todos os dados?",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancelar"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Apagar"),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmar == true) {
+                await context.read<TrilhaController>().resetarTudo();
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Dados apagados com sucesso")),
+                  );
+                }
+              }
+            },
+          ),
+          ListTile(
+            tileColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            leading: const Icon(Icons.download, color: Colors.green),
+            title: const Text("Exportar Backup"),
+            subtitle: const Text(
+              "Salva todas as tarefas e sessões em arquivo JSON",
+            ),
+            onTap: () async {
+              final backupService = BackupService();
+              final path = await backupService.exportarBackup();
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Backup salvo em: $path")),
+                );
+              }
+            },
           ),
         ],
       ),

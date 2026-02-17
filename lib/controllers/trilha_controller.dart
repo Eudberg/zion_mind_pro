@@ -214,6 +214,27 @@ class TrilhaController extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
+  Future<void> resetarTudo() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _tarefasDAO.deletarTudo();
+      await _sessoesDAO.deletarTudo();
+      // se quiser limpar outras tabelas depois:
+      // await QuestoesDao().deletarTudo();
+      // await MateriasDao().deletarTudo();
+      // await AssuntosDao().deletarTudo();
+    } catch (e) {
+      debugPrint("Erro ao resetar dados: $e");
+    }
+
+    _tarefas.clear();
+    _minutosPorDisciplinaSessoes.clear();
+
+    _isLoading = false;
+    notifyListeners();
+  }
 
   String _normDisciplina(String s) => s.trim().toUpperCase();
   String _norm(String s) =>
@@ -830,5 +851,72 @@ Future<void> importarTrilha(List<int> bytes) async {
 
     _isLoading = false;
     notifyListeners();
+  }
+  
+  Future<List<int>> _getPlanoIdsHoje() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _keyPlanoHoje();
+    final list = prefs.getStringList(key) ?? [];
+    return list.map((e) => int.tryParse(e)).whereType<int>().toList();
+  }
+
+  Future<void> limparPlanoHoje() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyPlanoHoje());
+    notifyListeners();
+  }
+
+  Future<void> gerarPlanoHoje() async {
+    final sugestoes = sugestoesPlanoDia;
+
+    // precisamos de ids
+    final ids = sugestoes.map((t) => t.id).whereType<int>().toList();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _keyPlanoHoje(),
+      ids.map((e) => e.toString()).toList(),
+    );
+
+    notifyListeners();
+  }
+
+  Future<List<TarefaTrilha>> get planoHoje async {
+    final ids = await _getPlanoIdsHoje();
+    if (ids.isEmpty) return [];
+
+    // usa o cache em memória (_tarefas) já carregado
+    final porId = tarefasPorId;
+    final lista = <TarefaTrilha>[];
+    for (final id in ids) {
+      final t = porId[id];
+      if (t != null && !t.concluida) lista.add(t);
+    }
+    return lista;
+  }
+  // =========================
+  // Plano do dia (persistido)
+  // =========================
+
+  String _keyPlanoHoje() {
+    final now = DateTime.now();
+    final y = now.year.toString().padLeft(4, '0');
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return 'plano_${y}${m}${d}';
+  }
+
+    
+  Future<List<TarefaTrilha>> getPlanoHoje() async {
+    final ids = await _getPlanoIdsHoje();
+    if (ids.isEmpty) return [];
+
+    final porId = tarefasPorId; // você já tem esse getter
+    final lista = <TarefaTrilha>[];
+    for (final id in ids) {
+      final t = porId[id];
+      if (t != null && !t.concluida) lista.add(t);
+    }
+    return lista;
   }
 }

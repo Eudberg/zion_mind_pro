@@ -22,9 +22,7 @@ class _TelaInicioState extends State<TelaInicio> {
   Future<void> _abrirTarefa(TarefaTrilha tarefa) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => TarefaTrilhaDetalhe(tarefa: tarefa),
-      ),
+      MaterialPageRoute(builder: (_) => TarefaTrilhaDetalhe(tarefa: tarefa)),
     );
     if (!mounted) return;
     await context.read<TrilhaController>().carregarTarefas();
@@ -43,9 +41,9 @@ class _TelaInicioState extends State<TelaInicio> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<TrilhaController>();
-    final sugestoes = controller.sugestoesPlanoDia;
     final prioridade = controller.prioridadePendentes;
     final proximaAcao = prioridade.isNotEmpty ? prioridade.first : null;
+
     final progressoMeta = controller.metaMinutosDia > 0
         ? (controller.minutosHoje / controller.metaMinutosDia).clamp(0.0, 1.0)
         : 0.0;
@@ -82,6 +80,7 @@ class _TelaInicioState extends State<TelaInicio> {
               style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 18),
+
             const _SectionTitle('Resumo'),
             const SizedBox(height: 10),
             Card(
@@ -107,6 +106,10 @@ class _TelaInicioState extends State<TelaInicio> {
               ),
             ),
             const SizedBox(height: 18),
+
+            // =========================
+            // PLANEJAMENTO DO DIA (NOVO)
+            // =========================
             const _SectionTitle('Planejamento do dia'),
             const SizedBox(height: 10),
             Wrap(
@@ -133,24 +136,113 @@ class _TelaInicioState extends State<TelaInicio> {
               '${controller.minutosHoje} / ${controller.metaMinutosDia} min',
               style: const TextStyle(color: Colors.white60),
             ),
-            const SizedBox(height: 10),
-            if (sugestoes.isEmpty)
-              const Text(
-                'Sem sugestões para hoje.',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ...sugestoes.map(
-              (t) => Card(
-                child: ListTile(
-                  title: Text(t.disciplina),
-                  subtitle: Text('${t.assunto} - ${t.chPlanejadaMin} min'),
-                  trailing: TextButton(
-                    onPressed: () => _abrirTarefa(t),
-                    child: const Text('Abrir'),
+            const SizedBox(height: 12),
+
+            FutureBuilder<List<TarefaTrilha>>(
+              future: controller.getPlanoHoje(),
+              builder: (context, snapshot) {
+                final plano = snapshot.data ?? [];
+
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Plano de hoje',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            if (plano.isNotEmpty)
+                              Text(
+                                '${plano.length} itens',
+                                style: const TextStyle(color: Colors.white54),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        if (plano.isEmpty) ...[
+                          const Text(
+                            'Nenhum plano montado ainda.',
+                            style: TextStyle(color: Colors.white54),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                await controller.gerarPlanoHoje();
+                                if (!mounted) return;
+                                setState(() {});
+                              },
+                              icon: const Icon(Icons.auto_awesome),
+                              label: const Text('Montar plano do dia'),
+                            ),
+                          ),
+                        ] else ...[
+                          ...plano.map(
+                            (t) => Card(
+                              child: ListTile(
+                                title: Text(t.disciplina),
+                                subtitle: Text(
+                                  '${t.assunto} - ${t.chPlanejadaMin} min',
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () => _abrirTarefa(t),
+                                      child: const Text('Abrir'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed: () => _iniciarCronometro(t),
+                                      child: const Text('▶'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    await controller.gerarPlanoHoje();
+                                    if (!mounted) return;
+                                    setState(() {});
+                                  },
+                                  child: const Text('Refazer'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    await controller.limparPlanoHoje();
+                                    if (!mounted) return;
+                                    setState(() {});
+                                  },
+                                  child: const Text('Limpar'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
+
             const SizedBox(height: 18),
             const _SectionTitle('Próxima ação'),
             const SizedBox(height: 10),

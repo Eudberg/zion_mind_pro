@@ -101,8 +101,8 @@ class TarefasTrilhaDAO {
   }
 
   // Método opcional para deletar (caso precise no futuro)
-  Future<int> deletar(int id) async {
-    Database db = await _dbHelper.database;
-    return await db.delete('tarefas_trilha', where: 'id = ?', whereArgs: [id]);
+  Future<void> deletarTudo() async {
+    final db = await _dbHelper.database;
+    await db.delete('tarefas_trilha');
   }
 }

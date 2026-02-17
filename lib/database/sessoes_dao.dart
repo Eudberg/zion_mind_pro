@@ -18,4 +18,8 @@ class SessoesDao {
       return SessaoEstudo.fromMap(maps[i]);
     });
   }
+  Future<void> deletarTudo() async {
+    final db = await _dbHelper.database;
+    await db.delete('sessoes_estudo');
+  }
 }
