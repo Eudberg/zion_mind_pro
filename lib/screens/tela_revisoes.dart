@@ -27,8 +27,8 @@ class TelaRevisoes extends StatelessWidget {
           const TabBar(
             tabs: [
               Tab(text: 'Programadas'),
-              Tab(text: 'Atrasadas-Hoje'),
-              Tab(text: 'Concluidas'),
+              Tab(text: 'Atrasadas/Hoje'),
+              Tab(text: 'Concluídas'),
             ],
           ),
           Expanded(

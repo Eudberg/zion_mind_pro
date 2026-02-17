@@ -48,7 +48,7 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                   ),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('Mes'),
+                    child: Text('Mês'),
                   ),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 10),
@@ -60,7 +60,7 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
               if (metricas.isEmpty)
                 const Center(
                   child: Text(
-                    'Nenhum dado para exibir neste periodo.',
+                    'Nenhum dado para exibir neste período.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white38),
                   ),
@@ -85,7 +85,7 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                 ),
                 const SizedBox(height: 30),
                 const Text(
-                  'Desempenho (Questoes)',
+                  'Desempenho (Questões)',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
