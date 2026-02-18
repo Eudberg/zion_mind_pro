@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'screens/tela_inicial.dart';
 import 'controllers/trilha_controller.dart';
 import 'controllers/estudo_controller.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(
@@ -27,16 +28,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Zion Mind Pro',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFF0F172A), // Slate 900
-        primaryColor: const Color(0xFF1E293B), // Slate 800
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.blue,
-          secondary: Colors.blueAccent,
-          surface: Color(0xFF1E293B), // Background dos cards
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.midnightBlueEmerald,
       // Apontando corretamente para a classe de interface (UI)
       home: const TelaInicial(),
     );

@@ -49,7 +49,6 @@ class _TelaInicioState extends State<TelaInicio> {
         : 0.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       body: RefreshIndicator(
         onRefresh: _atualizarDados,
         child: ListView(
@@ -68,7 +67,12 @@ class _TelaInicioState extends State<TelaInicio> {
                       height: 12,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: ativo ? Colors.greenAccent : Colors.white24,
+                        color: ativo
+                            ? Theme.of(context).colorScheme.secondary
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant
+                                .withOpacity(0.24),
                       ),
                     ),
                   )
@@ -76,8 +80,10 @@ class _TelaInicioState extends State<TelaInicio> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${controller.streakAtual} dias em sequência · Recorde: ${controller.recordeStreak}',
-              style: const TextStyle(color: Colors.white70),
+              '${controller.streakAtual} dias de estudo em sequência. Recorde: ${controller.recordeStreak}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 18),
 
@@ -98,7 +104,7 @@ class _TelaInicioState extends State<TelaInicio> {
                       '${controller.tarefasPendentes.length}',
                     ),
                     _ResumoLinha(
-                      'Revisões atrasadas/hoje',
+                      'Revisões atrasadas',
                       '${controller.revisoesAtrasadasOuHoje.length}',
                     ),
                   ],
@@ -128,13 +134,18 @@ class _TelaInicioState extends State<TelaInicio> {
             LinearProgressIndicator(
               value: progressoMeta,
               minHeight: 8,
-              backgroundColor: Colors.white12,
-              color: Colors.blueAccent,
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withOpacity(0.12),
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(height: 6),
             Text(
               '${controller.minutosHoje} / ${controller.metaMinutosDia} min',
-              style: const TextStyle(color: Colors.white60),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -160,16 +171,24 @@ class _TelaInicioState extends State<TelaInicio> {
                             if (plano.isNotEmpty)
                               Text(
                                 '${plano.length} itens',
-                                style: const TextStyle(color: Colors.white54),
+                                style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                               ),
                           ],
                         ),
                         const SizedBox(height: 10),
 
                         if (plano.isEmpty) ...[
-                          const Text(
+                          Text(
                             'Nenhum plano montado ainda.',
-                            style: TextStyle(color: Colors.white54),
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 10),
                           SizedBox(
@@ -188,21 +207,27 @@ class _TelaInicioState extends State<TelaInicio> {
                           ...plano.map(
                             (t) => Card(
                               child: ListTile(
-                                title: Text(t.disciplina),
+                                  title: Text(
+                                  t.disciplina,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 subtitle: Text(
                                   '${t.assunto} - ${t.chPlanejadaMin} min',
-                                ),
-                                trailing: Row(
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),                                trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     TextButton(
                                       onPressed: () => _abrirTarefa(t),
                                       child: const Text('Abrir'),
                                     ),
-                                    const SizedBox(width: 8),
-                                    ElevatedButton(
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      tooltip: 'Iniciar cronômetro',
+                                      icon: const Icon(Icons.play_circle_fill),
                                       onPressed: () => _iniciarCronometro(t),
-                                      child: const Text('▶'),
                                     ),
                                   ],
                                 ),
@@ -244,12 +269,14 @@ class _TelaInicioState extends State<TelaInicio> {
             ),
 
             const SizedBox(height: 18),
-            const _SectionTitle('Próxima ação'),
+            const _SectionTitle('Próxima Tarefa'),
             const SizedBox(height: 10),
             if (proximaAcao == null)
-              const Text(
-                'Nenhuma ação pendente.',
-                style: TextStyle(color: Colors.white54),
+              Text(
+                'Nenhuma Tarefa pendente.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               )
             else
               Card(
@@ -306,8 +333,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 18,
         fontWeight: FontWeight.bold,
       ),
@@ -328,11 +355,16 @@ class _ResumoLinha extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
           ),

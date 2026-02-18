@@ -339,7 +339,7 @@ class _Header extends StatelessWidget {
                         ? Icons.pause_circle_filled
                         : Icons.play_circle_fill,
                     size: 18,
-                    color: Colors.blueAccent,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   label: Text(
                     estudoController.estudando && cronometroDaTarefa

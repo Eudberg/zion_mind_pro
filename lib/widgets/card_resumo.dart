@@ -21,24 +21,27 @@ class CardResumo extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icone, color: Colors.blueAccent),
+              Icon(icone, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 12),
               Text(
                 valor,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(titulo, style: const TextStyle(color: Colors.white70)),
+              Text(
+                titulo,
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
             ],
           ),
         ),

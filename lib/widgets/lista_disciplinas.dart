@@ -14,10 +14,10 @@ class ListaDisciplinas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (disciplinas.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           "Nenhuma disciplina encontrada.\nImporte a trilha no ícone acima.",
-          style: TextStyle(color: Colors.white54),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),
       );
@@ -26,12 +26,12 @@ class ListaDisciplinas extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Disciplinas',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -42,17 +42,17 @@ class ListaDisciplinas extends StatelessWidget {
 
   Widget _buildItem(BuildContext context, Disciplina d) {
     // Lógica simples de cor baseada no progresso
-    Color cor = Colors.blue;
+    Color cor = Theme.of(context).colorScheme.primary;
     String status = "Iniciando";
 
     if (d.progresso >= 1.0) {
-      cor = Colors.green;
+      cor = Theme.of(context).colorScheme.secondary;
       status = "Concluída";
     } else if (d.progresso > 0.5) {
-      cor = Colors.amber;
+      cor = const Color(0xFFF59E0B);
       status = "Em andamento";
     } else if (d.progresso == 0) {
-      cor = Colors.redAccent;
+      cor = Theme.of(context).colorScheme.error;
       status = "Não iniciada";
     }
 
@@ -62,7 +62,7 @@ class ListaDisciplinas extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -73,8 +73,8 @@ class ListaDisciplinas extends StatelessWidget {
                 Expanded(
                   child: Text(
                     d.nome,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -105,7 +105,7 @@ class ListaDisciplinas extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: d.progresso,
-                backgroundColor: Colors.white10,
+                backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
                 color: cor,
                 minHeight: 6,
               ),
@@ -116,3 +116,4 @@ class ListaDisciplinas extends StatelessWidget {
     );
   }
 }
+

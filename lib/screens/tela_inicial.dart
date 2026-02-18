@@ -34,13 +34,11 @@ class _TelaInicialState extends State<TelaInicial> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B), // Slate 800
         elevation: 0,
         centerTitle: false,
         title: const Text(
           'Zion Mind Pro',
           style: TextStyle(
-            color: Colors.white,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.5,
           ),
@@ -48,7 +46,7 @@ class _TelaInicialState extends State<TelaInicial> {
         actions: [
           // Botão de Engrenagem para acessar Importação e Configurações
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
+            icon: const Icon(Icons.settings),
             tooltip: 'Configurações e Importação',
             onPressed: () {
               Navigator.push(
@@ -65,9 +63,6 @@ class _TelaInicialState extends State<TelaInicial> {
       // O IndexedStack preserva o estado (scroll, etc) de cada aba ao alternar
       body: IndexedStack(index: _selectedIndex, children: _telas),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: Colors.blue[400],
-        unselectedItemColor: Colors.grey[500],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType

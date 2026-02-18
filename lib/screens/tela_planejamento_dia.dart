@@ -27,9 +27,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
         title: const Text('Planejamento do Dia'),
         actions: [
           IconButton(
@@ -60,7 +58,7 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                       style: Theme.of(context)
                           .textTheme
                           .titleLarge
-                          ?.copyWith(color: Colors.white),
+                          ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
                     ),
                     const Spacer(),
                     Container(
@@ -69,13 +67,13 @@ class _TelaPlanejamentoDiaState extends State<TelaPlanejamentoDia> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         '${tarefasDia.length + revisoes.length} Meta',
-                        style: const TextStyle(
-                          color: Colors.blueAccent,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -134,18 +132,21 @@ class _SectionTitle extends StatelessWidget {
           style: Theme.of(context)
               .textTheme
               .titleMedium
-              ?.copyWith(color: Colors.white70),
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             count.toString(),
-            style: const TextStyle(fontSize: 12, color: Colors.white),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ),
       ],
@@ -178,13 +179,13 @@ class _PlanoCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: estaConcluido
-            ? const Color(0xFF0F172A).withOpacity(0.8)
-            : Colors.white.withOpacity(0.05),
+            ? Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8)
+            : Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: estaConcluido
-              ? Colors.green.withOpacity(0.5)
-              : Colors.white.withOpacity(0.08),
+              ? Theme.of(context).colorScheme.secondary.withOpacity(0.5)
+              : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
         ),
       ),
       child: Row(
@@ -193,7 +194,9 @@ class _PlanoCard extends StatelessWidget {
           Icon(
             tipo == 'estudo' ? Icons.book : Icons.history,
             size: 20,
-            color: estaConcluido ? Colors.green : Colors.white70,
+            color: estaConcluido
+                ? Theme.of(context).colorScheme.secondary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -206,7 +209,9 @@ class _PlanoCard extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     decoration: estaConcluido ? TextDecoration.lineThrough : null,
-                    color: estaConcluido ? Colors.white54 : Colors.white,
+                    color: estaConcluido
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -215,16 +220,18 @@ class _PlanoCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: estaConcluido ? Colors.white38 : Colors.grey,
+                    color: estaConcluido
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   tipo.replaceAll('_', ' ').toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 0.4,
-                    color: Colors.white38,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -257,8 +264,8 @@ class _PlanoCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: estaConcluido
-                        ? Colors.green
-                        : Colors.white.withOpacity(0.1),
+                        ? Theme.of(context).colorScheme.secondary
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -267,17 +274,17 @@ class _PlanoCard extends StatelessWidget {
                       Icon(
                         estaConcluido ? Icons.edit_calendar : Icons.check_circle_outline,
                         size: 14,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         estaConcluido && dataConclusao != null
                             ? DateFormat('dd/MM').format(dataConclusao)
                             : 'Concluir',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -304,9 +311,9 @@ class _PlanoCard extends StatelessWidget {
                 ),
               Text(
                 '$minutos min',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.white54,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 11,
                 ),
               ),
@@ -328,10 +335,13 @@ class _EmptyCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white54)),
+      child: Text(
+        text,
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
     );
   }
 }

@@ -12,7 +12,7 @@ class TelaTrilha extends StatelessWidget {
     return Consumer<TrilhaController>(
       builder: (context, controller, _) {
         if (controller.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator());
         }
 
         // Pega pendentes e agrupa por nome da trilha (ex: "Trilha 0")
@@ -21,11 +21,13 @@ class TelaTrilha extends StatelessWidget {
             .toList();
 
         if (pendentes.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
               "Nenhuma tarefa pendente.\nImporte sua trilha nas configurações.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white38),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           );
         }
@@ -57,14 +59,15 @@ class TelaTrilha extends StatelessWidget {
 
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              color: const Color(0xFF1E293B),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
               elevation: 0,
               child: ExpansionTile(
-                collapsedIconColor: Colors.white54,
-                iconColor: Colors.white70,
+                collapsedIconColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant,
+                iconColor: Theme.of(context).colorScheme.onSurface,
                 tilePadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 6,
@@ -75,8 +78,8 @@ class TelaTrilha extends StatelessWidget {
                     Expanded(
                       child: Text(
                         nomeTrilha.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.6,
                         ),
@@ -88,13 +91,15 @@ class TelaTrilha extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.06),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.06),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         '${tarefasDaTrilha.length} tarefas',
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -103,7 +108,10 @@ class TelaTrilha extends StatelessWidget {
                 ),
                 subtitle: Text(
                   _rangeLabel(tarefasDaTrilha),
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
                 children: tarefasDaTrilha
                     .map((t) => _TarefaTile(tarefa: t))
@@ -150,17 +158,19 @@ class _TarefaTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+        ),
       ),
       child: ListTile(
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         title: Text(
           tarefa.assunto,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
           ),
           maxLines: 1,
@@ -170,8 +180,8 @@ class _TarefaTile extends StatelessWidget {
             ? null
             : Text(
                 tarefa.descricao!.trim(),
-                style: const TextStyle(
-                  color: Colors.white60,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                   height: 1.25,
                 ),
@@ -180,7 +190,10 @@ class _TarefaTile extends StatelessWidget {
               ),
         trailing: Text(
           '#${tarefa.ordemGlobal}',
-          style: const TextStyle(color: Colors.white38, fontSize: 12),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
         ),
         onTap: () async {
           await Navigator.push(

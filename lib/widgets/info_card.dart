@@ -23,7 +23,7 @@ class InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -33,14 +33,17 @@ class InfoCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             valor,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
-          Text(titulo, style: const TextStyle(color: Colors.white70)),
+          Text(
+            titulo,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 4),
           Text(subtitulo, style: TextStyle(color: cor, fontSize: 12)),
         ],

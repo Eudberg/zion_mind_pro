@@ -104,12 +104,12 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Registrar Batalha',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -370,10 +370,10 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
     return true;
   }
 
-  Color _getCorDesempenho(double porcentagem) {
-    if (porcentagem >= 80) return Colors.greenAccent;
-    if (porcentagem >= 60) return Colors.amberAccent;
-    return Colors.redAccent;
+  Color _getCorDesempenho(BuildContext context, double porcentagem) {
+    if (porcentagem >= 80) return Theme.of(context).colorScheme.secondary;
+    if (porcentagem >= 60) return const Color(0xFFF59E0B);
+    return Theme.of(context).colorScheme.error;
   }
 
   @override
@@ -381,7 +381,6 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Histórico de Questões'),
-        backgroundColor: Colors.transparent,
       ),
       body: FutureBuilder<List<Questao>>(
         future: _questoesDao.listarTodas(),
@@ -425,18 +424,21 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
                             '${q.desempenho.toStringAsFixed(1)}%',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _getCorDesempenho(q.desempenho),
+                              color: _getCorDesempenho(context, q.desempenho),
                             ),
                           ),
                         ],
                       ),
-                      Text(q.assunto, style: const TextStyle(color: Colors.grey)),
+                      Text(
+                        q.assunto,
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
                       const SizedBox(height: 10),
                       LinearPercentIndicator(
                         lineHeight: 8.0,
                         percent: q.desempenho / 100,
-                        progressColor: _getCorDesempenho(q.desempenho),
-                        backgroundColor: Colors.grey[800],
+                        progressColor: _getCorDesempenho(context, q.desempenho),
+                        backgroundColor: Theme.of(context).cardColor,
                         barRadius: const Radius.circular(4),
                         padding: EdgeInsets.zero,
                       ),
@@ -455,7 +457,6 @@ class _TelaQuestoesState extends State<TelaQuestoes> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _adicionarQuestao,
-        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.quiz),
       ),
     );

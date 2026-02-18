@@ -21,11 +21,17 @@ class DisciplineStatusList extends StatelessWidget {
           padding: const EdgeInsets.all(32.0),
           child: Column(
             children: [
-              Icon(Icons.inbox, size: 48, color: Colors.grey[700]),
+              Icon(
+                Icons.inbox,
+                size: 48,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(height: 16),
               Text(
                 "Nenhuma tarefa por aqui.",
-                style: TextStyle(color: Colors.grey[500]),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -48,8 +54,8 @@ class DisciplineStatusList extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Lógica de Cores e Status
-    Color statusColor = Colors.blue;
+    // LÃ³gica de Cores e Status
+    Color statusColor = const Color(0xFF2563EB);
     String statusLabel = "NOVA";
     bool isOverdue = false;
 
@@ -64,18 +70,18 @@ class DisciplineStatusList extends StatelessWidget {
 
         if (isRevisaoTab) {
           // Aba Futura
-          statusColor = Colors.green;
+          statusColor = const Color(0xFF10B981);
           final days = revDateNormalized.difference(today).inDays;
           statusLabel = "AGENDADA (${days}d)";
         } else {
           // Aba Principal (Hoje ou Atrasada)
           if (revDateNormalized.isBefore(today)) {
-            statusColor = Colors.red;
+            statusColor = const Color(0xFFEF4444);
             statusLabel = "ATRASADA";
             isOverdue = true;
           } else {
-            statusColor = Colors.amber;
-            statusLabel = "REVISÃO HOJE";
+            statusColor = const Color(0xFFF59E0B);
+            statusLabel = "REVISÃƒO HOJE";
           }
         }
       }
@@ -84,10 +90,12 @@ class DisciplineStatusList extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B), // Slate 800
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isOverdue ? Colors.red : Colors.white.withOpacity(0.1),
+          color: isOverdue
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).dividerColor,
           width: isOverdue ? 2 : 1,
         ),
         boxShadow: [
@@ -106,7 +114,7 @@ class DisciplineStatusList extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Ícone
+                // Ãcone
                 Icon(
                   tarefa.estagioRevisao > 0 ? Icons.loop : Icons.assignment,
                   color: statusColor,
@@ -121,8 +129,8 @@ class DisciplineStatusList extends StatelessWidget {
                     children: [
                       Text(
                         tarefa.disciplina,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                           letterSpacing: 0.5,
@@ -131,7 +139,10 @@ class DisciplineStatusList extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         tarefa.assunto,
-                        style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14,
+                        ),
                       ),
                       // Label de Status
                       Padding(
@@ -149,12 +160,12 @@ class DisciplineStatusList extends StatelessWidget {
                   ),
                 ),
 
-                // Botão de Check (Só aparece se NÃO for aba de revisões futuras)
+                // BotÃ£o de Check (SÃ³ aparece se NÃƒO for aba de revisÃµes futuras)
                 if (!isRevisaoTab)
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.check_box_outline_blank,
-                      color: Colors.grey,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       size: 28,
                     ),
                     onPressed: () => _showCompletionDialog(context, tarefa),
@@ -164,31 +175,48 @@ class DisciplineStatusList extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Rodapé Metadata
+            // RodapÃ© Metadata
             Row(
               children: [
                 // Usando ID ou Ordem Global se preferir
                 Text(
                   "#${tarefa.id}",
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
                 const SizedBox(width: 16),
 
                 if (tarefa.estagioRevisao > 0) ...[
-                  Icon(Icons.history, size: 14, color: Colors.grey[500]),
+                  Icon(
+                    Icons.history,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     "Ciclo: ${tarefa.estagioRevisao == 1 ? '7d' : (tarefa.estagioRevisao == 2 ? '30d' : '60d')}",
-                    style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(width: 16),
                 ],
 
-                Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                Icon(
+                  Icons.access_time,
+                  size: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   "${tarefa.duracaoMinutos} min",
-                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -209,33 +237,39 @@ class DisciplineStatusList extends StatelessWidget {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
           title: Text(
             tarefa.estagioRevisao == 0
                 ? "Registrar Estudo"
-                : "Registrar Revisão",
-            style: const TextStyle(color: Colors.white),
+                : "Registrar RevisÃ£o",
+            style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 tarefa.disciplina,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: timeController,
                 keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
                 decoration: InputDecoration(
                   labelText: "Tempo (min)",
-                  labelStyle: TextStyle(color: Colors.blue[300]),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  labelStyle: TextStyle(
+                    color: Theme.of(ctx).colorScheme.primary,
                   ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(ctx).dividerColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(ctx).colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
@@ -246,15 +280,19 @@ class DisciplineStatusList extends StatelessWidget {
                     child: TextField(
                       controller: qTotalController,
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
                       decoration: InputDecoration(
                         labelText: "Q. Feitas",
-                        labelStyle: TextStyle(color: Colors.blue[300]),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey[700]!),
+                        labelStyle: TextStyle(
+                          color: Theme.of(ctx).colorScheme.primary,
                         ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.blue),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(ctx).dividerColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: Theme.of(ctx).colorScheme.primary,
+                          ),
                         ),
                       ),
                     ),
@@ -264,15 +302,19 @@ class DisciplineStatusList extends StatelessWidget {
                     child: TextField(
                       controller: qCorrectController,
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
                       decoration: InputDecoration(
                         labelText: "Q. Certas",
-                        labelStyle: TextStyle(color: Colors.green[300]),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey[700]!),
+                        labelStyle: TextStyle(
+                          color: Theme.of(ctx).colorScheme.secondary,
                         ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.green),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(ctx).dividerColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: Theme.of(ctx).colorScheme.secondary,
+                          ),
                         ),
                       ),
                     ),
@@ -284,13 +326,12 @@ class DisciplineStatusList extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 "Cancelar",
-                style: TextStyle(color: Colors.redAccent),
+                style: TextStyle(color: Theme.of(ctx).colorScheme.error),
               ),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               onPressed: () {
                 final minutos = int.tryParse(timeController.text) ?? 0;
                 final total = int.tryParse(qTotalController.text) ?? 0;
@@ -304,9 +345,9 @@ class DisciplineStatusList extends StatelessWidget {
 
                 Navigator.pop(ctx);
               },
-              child: const Text(
+              child: Text(
                 "Salvar",
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
               ),
             ),
           ],

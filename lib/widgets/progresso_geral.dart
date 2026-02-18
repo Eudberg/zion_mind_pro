@@ -46,7 +46,7 @@ class ProgressoGeral extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(
               0.05,
             ), // Compatibilidade com versões anteriores do Flutter
             borderRadius: BorderRadius.circular(16),
@@ -57,7 +57,7 @@ class ProgressoGeral extends StatelessWidget {
               Text(
                 'Progresso Geral',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -68,9 +68,9 @@ class ProgressoGeral extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: progresso,
                   minHeight: 10,
-                  backgroundColor: Colors.white.withOpacity(0.1),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    Colors.blueAccent,
+                  backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -80,14 +80,14 @@ class ProgressoGeral extends StatelessWidget {
                 children: [
                   Text(
                     '$pct% concluído',
-                    style: const TextStyle(
-                      color: Colors.blueAccent,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     '${totalMinutosEstudados ~/ 60}h / ${totalMinutosPlanejados ~/ 60}h',
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                   ),
                 ],
               ),
@@ -98,3 +98,4 @@ class ProgressoGeral extends StatelessWidget {
     );
   }
 }
+

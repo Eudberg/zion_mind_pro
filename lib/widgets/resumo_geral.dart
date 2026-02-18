@@ -67,7 +67,7 @@ class _ResumoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

@@ -17,14 +17,17 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       body: Consumer<TrilhaController>(
         builder: (context, controller, _) {
-          final metricas = controller.metricasPorMateriaPeriodo(_periodoSelecionado);
+          final metricas = controller.metricasPorMateriaPeriodo(
+            _periodoSelecionado,
+          );
 
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              const _IterumLogotypeCard(),
+              const SizedBox(height: 20),
               ToggleButtons(
                 isSelected: [
                   _periodoSelecionado == PeriodoMetrica.hoje,
@@ -58,18 +61,20 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
               ),
               const SizedBox(height: 20),
               if (metricas.isEmpty)
-                const Center(
+                Center(
                   child: Text(
-                    'Nenhum dado para exibir neste período.',
+                    'Nenhum dado para exibir neste perÃ­odo.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white38),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 )
               else ...[
-                const Text(
+                Text(
                   'Tempo Estudado (min)',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -84,10 +89,10 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                   ),
                 ),
                 const SizedBox(height: 30),
-                const Text(
+                Text(
                   'Desempenho (Questões)',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -106,6 +111,98 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
       ),
     );
   }
+}
+
+class _IterumLogotypeCard extends StatelessWidget {
+  const _IterumLogotypeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1530),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: CustomPaint(
+                painter: _IterumCircularIArrowPainter(),
+              ),
+            ),
+            SizedBox(width: 10),
+            Text(
+              'terum',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 34,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+                fontFamily: 'Montserrat',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IterumCircularIArrowPainter extends CustomPainter {
+  const _IterumCircularIArrowPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const emerald = Color(0xFF10B981);
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width * 0.34;
+    final strokeWidth = size.width * 0.14;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final ringPaint = Paint()
+      ..color = emerald
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(rect, 0.55, 4.95, false, ringPaint);
+
+    final arrowBase = Offset(
+      center.dx + radius * 0.94,
+      center.dy + radius * 0.28,
+    );
+    final arrowPath = Path()
+      ..moveTo(arrowBase.dx, arrowBase.dy)
+      ..lineTo(arrowBase.dx - size.width * 0.16, arrowBase.dy - size.width * 0.04)
+      ..lineTo(arrowBase.dx - size.width * 0.05, arrowBase.dy - size.width * 0.15)
+      ..close();
+    canvas.drawPath(
+      arrowPath,
+      Paint()..color = emerald,
+    );
+
+    final stemPaint = Paint()
+      ..color = emerald
+      ..style = PaintingStyle.fill;
+    final stemRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: center,
+        width: size.width * 0.16,
+        height: size.height * 0.62,
+      ),
+      Radius.circular(size.width * 0.08),
+    );
+    canvas.drawRRect(stemRect, stemPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _MateriaProgressoCard extends StatelessWidget {
@@ -133,16 +230,16 @@ class _MateriaProgressoCard extends StatelessWidget {
             children: [
               Text(
                 nome,
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 '${(progresso * 100).toStringAsFixed(1)}%',
-                style: const TextStyle(
-                  color: Colors.blueAccent,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -151,14 +248,20 @@ class _MateriaProgressoCard extends StatelessWidget {
           const SizedBox(height: 8),
           LinearProgressIndicator(
             value: progresso.clamp(0.0, 1.0),
-            backgroundColor: Colors.white10,
-            color: Colors.blueAccent,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withOpacity(0.1),
+            color: Theme.of(context).colorScheme.primary,
             minHeight: 8,
           ),
           const SizedBox(height: 4),
           Text(
             '$minRealizado min de $minTotal min previstos',
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
@@ -182,12 +285,17 @@ class _MateriaPrecisaoRow extends StatelessWidget {
         children: [
           Text(
             nome,
-            style: const TextStyle(color: Colors.white60, fontSize: 13),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
           ),
           Text(
             '$pct%',
             style: TextStyle(
-              color: precisao > 0.7 ? Colors.green : Colors.orange,
+              color: precisao > 0.7
+                  ? Theme.of(context).colorScheme.secondary
+                  : const Color(0xFFF59E0B),
               fontWeight: FontWeight.bold,
             ),
           ),
