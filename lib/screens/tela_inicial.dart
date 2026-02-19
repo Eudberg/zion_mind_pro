@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+
 import 'tela_inicio.dart';
 import 'tela_trilha.dart';
 import 'tela_revisoes.dart';
 import 'tela_estatisticas.dart';
 import 'tela_configuracoes.dart';
+
+// NOVO:
+import '../widgets/iterum_title.dart';
 
 // CORREÇÃO: A classe agora se chama TelaInicial para não conflitar com o TrilhaController
 class TelaInicial extends StatefulWidget {
@@ -36,12 +40,10 @@ class _TelaInicialState extends State<TelaInicial> {
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        title: const Text(
-          'Zion Mind Pro',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
+title: Image.asset(
+          'assets/branding/iterum_logo.png',
+          height: 28,
+          fit: BoxFit.contain,
         ),
         actions: [
           // Botão de Engrenagem para acessar Importação e Configurações

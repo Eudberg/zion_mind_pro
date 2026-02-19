@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+
 import '../controllers/trilha_controller.dart';
 import '../services/backup_service.dart';
+
+// NOVO:
+import '../widgets/iterum_title.dart';
 
 class TelaConfiguracoes extends StatelessWidget {
   const TelaConfiguracoes({super.key});
@@ -10,13 +14,29 @@ class TelaConfiguracoes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Configurações")),
+      appBar: AppBar(
+        title: Image.asset(
+          'assets/branding/iterum_logo.png',
+          height: 28,
+          fit: BoxFit.contain,
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const SizedBox(height: 8),
+          const Text(
+            "Configurações",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
           Text(
             "Dados e Importação",
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           ListTile(
@@ -24,7 +44,10 @@ class TelaConfiguracoes extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            leading: Icon(Icons.file_upload, color: Theme.of(context).colorScheme.primary),
+            leading: Icon(
+              Icons.file_upload,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             title: const Text("Importar Trilha (CSV)"),
             subtitle: const Text(
               "Selecione o arquivo da sua trilha estratégica",
@@ -54,20 +77,18 @@ class TelaConfiguracoes extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
-          Text(
-            "Sobre",
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold),
-          ),
-          const ListTile(
-            title: Text("Zion Mind Pro"),
-            subtitle: Text("Versão 1.0.0 - Sistema de Revisão 7-30-60"),
-          ),
+
+          
+
           ListTile(
             tileColor: Theme.of(context).colorScheme.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            leading: Icon(Icons.delete_forever, color: Theme.of(context).colorScheme.error),
+            leading: Icon(
+              Icons.delete_forever,
+              color: Theme.of(context).colorScheme.error,
+            ),
             title: const Text("Limpar todos os dados"),
             subtitle: const Text("Remove trilhas, sessões e histórico"),
             onTap: () async {
@@ -102,12 +123,16 @@ class TelaConfiguracoes extends StatelessWidget {
               }
             },
           ),
+
           ListTile(
             tileColor: Theme.of(context).colorScheme.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            leading: Icon(Icons.download, color: Theme.of(context).colorScheme.secondary),
+            leading: Icon(
+              Icons.download,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
             title: const Text("Exportar Backup"),
             subtitle: const Text(
               "Salva todas as tarefas e sessões em arquivo JSON",
@@ -122,6 +147,17 @@ class TelaConfiguracoes extends StatelessWidget {
                 );
               }
             },
+          ),
+          Text(
+            "Sobre",
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const ListTile(
+            title: Text("Iterum by Berg Oliveira"),
+            subtitle: Text("Versão 1.0.0"),
           ),
         ],
       ),
