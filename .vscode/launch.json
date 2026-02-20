@@ -1,0 +1,16 @@
+﻿{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: Run (debug)",
+      "request": "launch",
+      "type": "dart"
+    },
+    {
+      "name": "Flutter: Integration Test (Android device)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/app_test.dart"
+    }
+  ]
+}

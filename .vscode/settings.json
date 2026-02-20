@@ -1,0 +1,4 @@
+﻿{
+  "dart.testExplorerMode": "on",
+  "dart.runPubGetOnPubspecChanges": "always"
+}

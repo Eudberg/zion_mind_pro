@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../controllers/estudo_controller.dart';
 import '../controllers/trilha_controller.dart';
 import '../models/tarefa_trilha.dart';
 import 'tarefa_trilha_detalhe.dart';
 import 'tela_cronometro.dart';
+import '../widgets/desempenho_geral_card.dart';
+
 
 class TelaInicio extends StatefulWidget {
   const TelaInicio({super.key});
@@ -43,6 +44,16 @@ class _TelaInicioState extends State<TelaInicio> {
     final controller = context.watch<TrilhaController>();
     final prioridade = controller.prioridadePendentes;
     final proximaAcao = prioridade.isNotEmpty ? prioridade.first : null;
+    final tarefas = controller.tarefas;
+    final totalQuestoes = tarefas.fold<int>(
+      0,
+      (sum, t) => sum + (t.questoes ?? 0),
+    );
+    final totalAcertos = tarefas.fold<int>(
+      0,
+      (sum, t) => sum + (t.acertos ?? 0),
+    );
+    final totalErros = (totalQuestoes - totalAcertos).clamp(0, totalQuestoes);
 
     final progressoMeta = controller.metaMinutosDia > 0
         ? (controller.minutosHoje / controller.metaMinutosDia).clamp(0.0, 1.0)
@@ -86,9 +97,16 @@ class _TelaInicioState extends State<TelaInicio> {
               ),
             ),
             const SizedBox(height: 18),
-
             const _SectionTitle('Resumo'),
             const SizedBox(height: 10),
+
+            //card desempenho geral//
+            DesempenhoGeralCard(
+              total: totalQuestoes,
+              corretas: totalAcertos,
+              erradas: totalErros,
+            ),
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12),
